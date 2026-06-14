@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// First-run onboarding (Settings/Home spec): detect the CLIs, pick a projects
+/// First-run onboarding: detect the CLIs, pick a projects
 /// folder, start. Under 60 seconds, no account creation, no cloud.
 struct OnboardingView: View {
     @ObservedObject var state: CanvasState

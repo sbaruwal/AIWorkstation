@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// New Agent flow (Agent Workflow spec, Steps 1–5): choose agent, repo, repo
+/// New Agent flow (Steps 1–5): choose agent, repo, repo
 /// mode, task (+ templates + context), then a **Review** summary before Launch.
 /// Presented as a centered glass card over a dimmed canvas.
 struct NewAgentSheet: View {

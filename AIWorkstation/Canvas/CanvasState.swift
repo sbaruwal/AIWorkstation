@@ -5,8 +5,8 @@ import AppKit
 /// Owns the workspace, the camera, selection, and chrome visibility.
 ///
 /// This is the single source of truth for the canvas. It deliberately knows
-/// nothing about PTYs, agents, or git — those are separate modules added in
-/// later phases (architecture boundary from the technical constitution).
+/// nothing about PTYs, agents, or git — those are separate modules
+/// (architecture boundary).
 @MainActor
 final class CanvasState: ObservableObject {
 
@@ -115,7 +115,7 @@ final class CanvasState: ObservableObject {
 
     var sidebarVisible: Bool { sidebarPinned || sidebarHovering }
 
-    /// Settings (Phase 7). Persisted to UserDefaults.
+    /// Settings. Persisted to UserDefaults.
     @Published var autoResume: Bool = true {
         didSet { defaults.set(autoResume, forKey: Keys.autoResume) }
     }
@@ -398,7 +398,7 @@ final class CanvasState: ObservableObject {
 
     /// Launch a Claude/Codex agent in a chosen repo.
     ///
-    /// Smart mode (Agent Workflow spec): the *first* agent on a repo runs in the
+    /// Smart mode: the *first* agent on a repo runs in the
     /// repo itself; any *additional* agent on the same git repo is isolated in its
     /// own worktree + branch so two agents never write to the same directory.
     @discardableResult
@@ -542,7 +542,7 @@ final class CanvasState: ObservableObject {
         }
     }
 
-    // MARK: Session controls (Agent Workflow spec)
+    // MARK: Session controls
 
     func renamePanel(_ id: UUID, to name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -562,7 +562,7 @@ final class CanvasState: ObservableObject {
     }
 
     /// Clone an agent into the same repo with the same task. In a git repo this
-    /// becomes an isolated worktree + branch (spec) since the repo is already busy.
+    /// becomes an isolated worktree + branch since the repo is already busy.
     func clonePanel(_ id: UUID) {
         guard let src = panel(id), let root = src.repoRoot, src.kind != .shell else { return }
         deliverLaunch(kind: src.kind, repoURL: URL(fileURLWithPath: root), mode: .auto,
@@ -801,8 +801,8 @@ final class CanvasState: ObservableObject {
     /// Names of project context files the launch prompt can point an agent at.
     private static let contextFileNames = ["constitution.md", "memory.md"]
 
-    /// Visible launch prompt (locked decision: don't paste files — tell the agent to
-    /// read the project's context files, then do the task).
+    /// Visible launch prompt: don't paste files — tell the agent to
+    /// read the project's context files, then do the task.
     ///
     /// Only the context files that **actually exist** in `directory` are named, so an
     /// agent launched in a repo without them gets a clean task prompt instead of
@@ -926,7 +926,7 @@ final class CanvasState: ObservableObject {
         }
     }
 
-    // MARK: Destructive-action confirmations (technical constitution: confirm)
+    // MARK: Destructive-action confirmations
 
     private enum WorktreeCleanup { case discard, keep, cancel }
 

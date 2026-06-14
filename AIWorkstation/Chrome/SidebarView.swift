@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Collapsible left sidebar. Hidden by default; reveals on edge hover or via the
-/// toolbar/pin. Phase 1 surfaces the live panel list and saved-layout affordance;
-/// Projects / recent repos become real in later phases.
+/// toolbar/pin. Surfaces the live panel list and saved-layout affordance;
+/// Projects / recent repos are not yet implemented.
 struct SidebarView: View {
     @ObservedObject var state: CanvasState
     let viewportSize: CGSize

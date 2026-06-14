@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Premium, minimal empty canvas (per Main Canvas spec): a few quick actions,
+/// Premium, minimal empty canvas: a few quick actions,
 /// no dense tutorial. Shown only when the workspace has zero panels.
 struct EmptyStateView: View {
     @ObservedObject var state: CanvasState

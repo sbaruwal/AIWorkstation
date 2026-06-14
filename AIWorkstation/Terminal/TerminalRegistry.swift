@@ -2,7 +2,7 @@ import Foundation
 
 /// Holds live `TerminalController`s keyed by panel id — in memory only.
 ///
-/// PTYs are never persisted (technical constitution): on relaunch a restored
+/// PTYs are never persisted: on relaunch a restored
 /// panel simply gets a fresh controller/session. This registry is the boundary
 /// between the canvas (which knows panels) and the terminal engine (which knows
 /// processes). It also tracks the active canvas theme so new and existing

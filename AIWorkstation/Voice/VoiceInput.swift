@@ -2,8 +2,8 @@ import Foundation
 import Speech
 import AVFoundation
 
-/// Push-to-talk speech-to-text (Phase 8). On-device where available; fills the
-/// command bar. V1 is dictation only — no voice planner, no autonomous actions.
+/// Push-to-talk speech-to-text. On-device where available; fills the
+/// command bar. Currently dictation only — no voice planner, no autonomous actions.
 @MainActor
 final class VoiceInput: ObservableObject {
     @Published private(set) var isRecording = false

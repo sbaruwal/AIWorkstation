@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Native preferences (⌘,). CLI detection + override, default repo folder, theme,
-/// behavior toggles, and a shortcut reference (Settings/Home spec).
+/// behavior toggles, and a shortcut reference.
 struct SettingsView: View {
     @ObservedObject var state: CanvasState
 

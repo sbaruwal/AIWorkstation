@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Optional deep-work view for one agent (Focus Mode spec). A large live terminal
+/// Optional deep-work view for one agent. A large live terminal
 /// beside a changed-files list + native unified-diff viewer, with quick controls
 /// and a re-prompt bar. Never required for normal interaction; Esc returns to the
 /// exact canvas. The same PTY view is reused — the canvas card releases it while

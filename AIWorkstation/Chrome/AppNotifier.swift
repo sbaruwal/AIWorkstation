@@ -1,7 +1,7 @@
 import SwiftUI
 import UserNotifications
 
-/// Lightweight dual notification surface (UI/UX spec → Notifications): an in-app
+/// Lightweight dual notification surface: an in-app
 /// toast stack plus a best-effort macOS local notification, so agents running
 /// across many cards/canvases can tell you when something needs attention even
 /// when you aren't watching that terminal.

@@ -1,7 +1,7 @@
 import AppKit
 
-/// Minimal native pickers used by the Phase 3 launch path. The full agent
-/// creation flow (command palette, task prompt, review screen) is Phase 5; here
+/// Minimal native pickers used by the launch path. The full agent
+/// creation flow (command palette, task prompt, review screen) lives elsewhere; here
 /// we just need to choose a repo folder and, if needed, locate a CLI binary.
 enum RepoPicker {
 

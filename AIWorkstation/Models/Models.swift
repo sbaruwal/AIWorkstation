@@ -1,7 +1,7 @@
 import Foundation
 import CoreGraphics
 
-/// How an agent uses its repo (Agent Workflow spec, Step 3). `.auto` = smart
+/// How an agent uses its repo. `.auto` = smart
 /// suggestion (separate unless another agent already uses the repo → worktree).
 enum RepoLaunchMode: String, CaseIterable, Identifiable, Equatable {
     case auto
@@ -18,7 +18,7 @@ enum RepoLaunchMode: String, CaseIterable, Identifiable, Equatable {
     }
 }
 
-/// Quick task presets (Agent Workflow spec). Prefill prompt text only — never a
+/// Quick task presets. Prefill prompt text only — never a
 /// planner agent.
 enum TaskTemplate: String, CaseIterable, Identifiable {
     case implement, review, refactor, debug, explain, architecture
@@ -36,8 +36,8 @@ enum TaskTemplate: String, CaseIterable, Identifiable {
     }
 }
 
-/// Which agent a panel hosts. V1 is locked to Claude Code + Codex; `.shell`
-/// exists only as a neutral placeholder for Phase 1 (real PTYs arrive in Phase 2).
+/// Which agent a panel hosts: Claude Code or Codex. `.shell` is a neutral
+/// placeholder kind for a plain (non-agent) terminal.
 enum AgentKind: String, Codable, CaseIterable {
     case claude
     case codex
@@ -52,7 +52,7 @@ enum AgentKind: String, Codable, CaseIterable {
     }
 }
 
-/// Minimal visible status language from the UI/UX constitution.
+/// Minimal visible status language.
 enum SessionStatus: String, Codable, CaseIterable {
     case idle
     case working
@@ -73,9 +73,8 @@ enum SessionStatus: String, Codable, CaseIterable {
 
 /// A movable/resizable card on the canvas.
 ///
-/// In Phase 1 this is a styled placeholder; the live PTY terminal is added in
-/// Phase 2. Position/size are stored in *world* (canvas) coordinates so the
-/// camera can pan/zoom independently.
+/// Position/size are stored in *world* (canvas) coordinates so the camera can
+/// pan/zoom independently of where cards sit.
 struct PanelModel: Identifiable, Codable, Equatable {
     var id: UUID = UUID()
     var kind: AgentKind = .shell

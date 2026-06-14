@@ -5,8 +5,8 @@ import Foundation
 /// Detection runs through the user's *login shell* (`$SHELL -lc 'command -v …'`)
 /// because the CLIs typically live in PATH entries (`~/.local/bin`, nvm, brew)
 /// that a Finder-launched app does not inherit. A manual override (set via the
-/// "locate CLI" affordance) always wins. Per the locked decisions we assume the
-/// CLIs are already installed and authenticated.
+/// "locate CLI" affordance) always wins. We assume the CLIs are already
+/// installed and authenticated.
 final class AgentCLI {
     static let shared = AgentCLI()
 

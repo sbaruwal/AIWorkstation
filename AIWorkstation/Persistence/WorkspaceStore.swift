@@ -1,9 +1,9 @@
 import Foundation
 
-/// Local-first JSON persistence (no SQLite in V1, per locked decision).
+/// Local-first JSON persistence (JSON only, no SQLite).
 ///
 /// Files live under `~/Library/Application Support/AIWorkstation/`. The store
-/// never persists a live PTY as if running — Phase 1 only persists layout +
+/// never persists a live PTY as if running — it only persists layout +
 /// metadata, which is exactly what survives a relaunch.
 final class WorkspaceStore {
     static let shared = WorkspaceStore()
@@ -13,14 +13,14 @@ final class WorkspaceStore {
     /// `~/Library/Application Support/AIWorkstation`
     let appSupportDir: URL
 
-    /// External, app-managed worktree root (created later in Phase 4, but the
+    /// External, app-managed worktree root (created on demand, but the
     /// path is reserved here so the location is centralized and never inside a repo).
     let worktreesDir: URL
 
     private var workspaceFile: URL { appSupportDir.appendingPathComponent("workspace.json") }
 
     /// Last folder a repo was picked from (used to seed the next picker).
-    /// The full default-repo-folder setting arrives with the Phase 7 Settings UI.
+    /// The full default-repo-folder setting is configured in the Settings UI.
     var defaultRepoFolder: URL? {
         get { defaults.url(forKey: "defaultRepoFolder") }
         set { defaults.set(newValue, forKey: "defaultRepoFolder") }

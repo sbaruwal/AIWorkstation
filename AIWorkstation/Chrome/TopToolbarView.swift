@@ -26,7 +26,6 @@ struct TopToolbarView: View {
             divider
 
             // Launch a real Claude / Codex agent: pick a repo, start the CLI there.
-            // (The richer command-palette + task-prompt flow arrives in Phase 5.)
             toolButton("plus", help: "New Claude agent") {
                 launchAgent(.claude)
             }

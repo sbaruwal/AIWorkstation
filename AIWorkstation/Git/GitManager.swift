@@ -16,11 +16,11 @@ enum GitError: LocalizedError {
     }
 }
 
-/// Thin wrapper over the `git` CLI for the repo/worktree operations V1 needs:
+/// Thin wrapper over the `git` CLI for the repo/worktree operations needed here:
 /// detect repo, create/remove worktrees + branches, list changed files.
 ///
 /// Same-repo isolation uses real git worktrees stored in an **external**
-/// app-managed folder (never inside the repo, per the locked decision):
+/// app-managed folder (never inside the repo):
 /// `~/Library/Application Support/AIWorkstation/Worktrees/{workspaceId}/{agentId}`.
 /// Branches follow `agent/{kind}-{timestamp}`. Merge stays manual/review-first.
 ///

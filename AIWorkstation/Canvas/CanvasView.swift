@@ -257,7 +257,7 @@ struct CanvasView: View {
             .zIndex(400)
     }
 
-    // MARK: Keyboard shortcuts (Main Canvas spec)
+    // MARK: Keyboard shortcuts
 
     private func hiddenShortcuts(viewport: CGSize) -> some View {
         Group {

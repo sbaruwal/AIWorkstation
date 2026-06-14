@@ -115,7 +115,7 @@ final class TerminalController: NSObject, ObservableObject, LocalProcessTerminal
         terminalView.onOutput = { [weak self] _ in self?.noteActivity() }
         applyTheme(theme)
         // Restored-from-disk sessions don't auto-start; they wait for an explicit
-        // Relaunch so we never pretend a dead PTY is still alive (constitution).
+        // Relaunch so we never pretend a dead PTY is still alive.
         if recoverable { runState = .recoverable }
     }
 
