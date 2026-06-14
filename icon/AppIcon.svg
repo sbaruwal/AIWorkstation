@@ -1,0 +1,37 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#12173c"/>
+      <stop offset="1" stop-color="#1e2657"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#6b8cff" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#6b8cff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect x="102" y="102" width="820" height="820" rx="183" fill="url(#bg)"/>
+  <rect x="102" y="102" width="820" height="820" rx="183" fill="url(#sheen)"/>
+  <rect x="104.5" y="104.5" width="815" height="815" rx="180.5" fill="none" stroke="#ffffff" stroke-opacity="0.10" stroke-width="3"/>
+
+  <circle cx="512" cy="512" r="300" fill="url(#glow)"/>
+  <circle cx="512" cy="512" r="230" fill="none" stroke="#6b8cff" stroke-opacity="0.28" stroke-width="6"/>
+
+  <line x1="512" y1="512" x2="512" y2="282" stroke="#6b8cff" stroke-opacity="0.18" stroke-width="5"/>
+  <line x1="512" y1="512" x2="711" y2="627" stroke="#6b8cff" stroke-opacity="0.18" stroke-width="5"/>
+  <line x1="512" y1="512" x2="313" y2="627" stroke="#6b8cff" stroke-opacity="0.18" stroke-width="5"/>
+
+  <circle cx="512" cy="282" r="40" fill="#6b8cff"/>
+  <circle cx="512" cy="282" r="40" fill="none" stroke="#6b8cff" stroke-opacity="0.30" stroke-width="11"/>
+  <circle cx="711" cy="627" r="40" fill="#5ccb84"/>
+  <circle cx="711" cy="627" r="40" fill="none" stroke="#5ccb84" stroke-opacity="0.30" stroke-width="11"/>
+  <circle cx="313" cy="627" r="40" fill="#f2bd52"/>
+  <circle cx="313" cy="627" r="40" fill="none" stroke="#f2bd52" stroke-opacity="0.30" stroke-width="11"/>
+
+  <rect x="424" y="424" width="176" height="176" rx="42" fill="#1b2250" stroke="#7e9bff" stroke-opacity="0.9" stroke-width="6"/>
+  <path d="M486,468 L544,512 L486,556" fill="none" stroke="#a8bcff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,24 @@
+# macOS
+.DS_Store
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+*.moved-aside
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# Internal design/spec package — not part of the public release
+AI_Workstation_Deep_Spec_Package/
+
+# Media / scratch (keep large binaries out of git)
+*.mp4
+*.mov
+
+# App-managed local data (created at runtime under ~/Library/Application Support)
