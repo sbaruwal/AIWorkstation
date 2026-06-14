@@ -92,9 +92,8 @@ A native Swift/SwiftUI app for macOS that puts **real PTY-backed terminals** on 
 
 ## Requirements
 
-- **macOS 15+** (the on-device smart-parse activates on macOS 26+ with Apple Intelligence).
-- **Apple Silicon** Mac.
-- **Xcode** with a recent macOS SDK.
+- **To build: Xcode 26 or later.** The app imports Apple's `FoundationModels`, which only exists in the macOS 26 SDK — older Xcode fails with `no such module 'FoundationModels'`.
+- **To run: macOS 15+ on an Apple Silicon Mac.** On macOS 26+ with Apple Intelligence the on-device command parser kicks in; on macOS 15 the app runs fine on its deterministic parser.
 - The agent CLIs you want to drive, installed and on your `PATH`:
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — `claude`
   - [Codex](https://github.com/openai/codex) — `codex`
