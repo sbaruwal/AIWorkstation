@@ -1,0 +1,7 @@
+# Code owners for AIWorkstation.
+#
+# Every file is owned by the repo owner, so when "Require review from Code Owners"
+# is enabled in branch protection, every pull request needs @sbaruwal's approval
+# before it can be merged.
+
+* @sbaruwal
