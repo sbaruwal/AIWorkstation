@@ -103,7 +103,7 @@ A native Swift/SwiftUI app for macOS that puts **real PTY-backed terminals** on 
 ## Build from source
 
 ```bash
-git clone <your-fork-url> AIWorkstation
+git clone https://github.com/sbaruwal/AIWorkstation.git
 cd AIWorkstation
 open AIWorkstation.xcodeproj      # then ⌘R in Xcode
 ```

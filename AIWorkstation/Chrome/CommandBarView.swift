@@ -38,7 +38,7 @@ struct CommandBarView: View {
             Button { autoRun.toggle() } label: {
                 Image(systemName: autoRun ? "bolt.fill" : "bolt.slash")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(autoRun ? Theme.accent : Theme.textTertiary)
+                    .foregroundStyle(autoRun ? state.accent : Theme.textTertiary)
                     .frame(width: 22, height: 22)
             }
             .buttonStyle(.plain)
@@ -46,11 +46,11 @@ struct CommandBarView: View {
 
             Button(action: submit) {
                 if state.isParsingCommand {
-                    ProgressView().controlSize(.small).tint(Theme.accent).frame(width: 21, height: 21)
+                    ProgressView().controlSize(.small).tint(state.accent).frame(width: 21, height: 21)
                 } else {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 21))
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(state.accent)
                 }
             }
             .buttonStyle(.plain)
@@ -80,7 +80,7 @@ struct CommandBarView: View {
         return Image(systemName: "sparkles")
             .font(.system(size: 12, weight: .semibold))
             .foregroundStyle(!available ? Theme.textTertiary.opacity(0.35)
-                             : (used ? Theme.accent : Theme.textSecondary))
+                             : (used ? state.accent : Theme.textSecondary))
             .scaleEffect(used ? 1.12 : 1)
             .animation(.easeInOut(duration: 0.2), value: used)
             .help(!available
@@ -95,7 +95,7 @@ struct CommandBarView: View {
         Button { showHelp.toggle() } label: {
             Image(systemName: "questionmark.circle")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(showHelp ? Theme.accent : Theme.textSecondary)
+                .foregroundStyle(showHelp ? state.accent : Theme.textSecondary)
                 .frame(width: 22, height: 22)
         }
         .buttonStyle(.plain)

@@ -48,9 +48,7 @@ struct CanvasView: View {
                     // and rebuilds with fresh state (no stale diff / file list carried
                     // over from the previously focused agent).
                     .id(focused.id)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Theme.cardStrokeSelected, lineWidth: 1.5))
+                    .themedCardFrame(state.canvasTheme, isSelected: true, accent: state.accent)
                     .shadow(color: Theme.cardShadow, radius: 30, y: 14)
                     .padding(EdgeInsets(top: 64, leading: 20, bottom: 92, trailing: 20))
                     .frame(width: viewport.width, height: viewport.height)
@@ -70,7 +68,7 @@ struct CanvasView: View {
             .overlay {
                 if dropTargeted {
                     RoundedRectangle(cornerRadius: 0)
-                        .strokeBorder(Theme.accent.opacity(0.8), lineWidth: 3)
+                        .strokeBorder(state.accent.opacity(0.8), lineWidth: 3)
                         .allowsHitTesting(false)
                 }
             }
@@ -216,6 +214,7 @@ struct CanvasView: View {
                         panels: state.panels,
                         camera: state.camera,
                         viewportSize: viewport,
+                        accent: state.accent,
                         onNavigate: { world in state.centerCamera(on: world, viewportSize: viewport) }
                     )
                     .padding(.trailing, 16)

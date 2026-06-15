@@ -17,6 +17,10 @@ final class WorkspaceStore {
     /// path is reserved here so the location is centralized and never inside a repo).
     let worktreesDir: URL
 
+    /// User-supplied canvas backdrop images (e.g. the Nature theme photo). Lives
+    /// OUTSIDE the repo so a licensed/personal image is never committed or shipped.
+    let backdropsDir: URL
+
     private var workspaceFile: URL { appSupportDir.appendingPathComponent("workspace.json") }
 
     /// Last folder a repo was picked from (used to seed the next picker).
@@ -49,7 +53,9 @@ final class WorkspaceStore {
         let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         appSupportDir = base.appendingPathComponent("AIWorkstation", isDirectory: true)
         worktreesDir = appSupportDir.appendingPathComponent("Worktrees", isDirectory: true)
+        backdropsDir = appSupportDir.appendingPathComponent("Backdrops", isDirectory: true)
         try? fm.createDirectory(at: appSupportDir, withIntermediateDirectories: true)
+        try? fm.createDirectory(at: backdropsDir, withIntermediateDirectories: true)
     }
 
     /// Load all canvases. Prefers the multi-canvas container format; falls back to the

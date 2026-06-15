@@ -85,11 +85,19 @@ enum CommandParser {
         // 2) Open a browser.
         if let url = browserTarget(text, lower) { return .browser(url: url) }
 
-        // 3) Create an agent: "claude …", "codex", "cc …".
-        let firstWord = String(lower.split(separator: " ", maxSplits: 1).first ?? Substring(lower))
-        if let kind = AgentCatalog.match(firstWord) {
-            let task = String(text.dropFirst(firstWord.count)).trimmingCharacters(in: .whitespacesAndNewlines)
-            return .agent(kind: kind, task: task)
+        // 3) Create an agent: "claude …", "codex", "cc …" — optionally prefixed with a
+        // launch verb people naturally type ("open codex", "new claude", "launch cc fix it").
+        // Without this, "open codex" wouldn't match here, would fall through to the
+        // on-device model, and could come back with an invented task. The agent keyword
+        // must immediately follow the (optional) verb; everything after it is the task.
+        let tokens = text.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        if !tokens.isEmpty {
+            let launchVerbs: Set<String> = ["open", "new", "launch", "start", "run", "create"]
+            let kwIndex = (tokens.count >= 2 && launchVerbs.contains(tokens[0].lowercased())) ? 1 : 0
+            if let kind = AgentCatalog.match(tokens[kwIndex].lowercased()) {
+                let task = tokens.dropFirst(kwIndex + 1).joined(separator: " ")
+                return .agent(kind: kind, task: task)
+            }
         }
         return nil
     }

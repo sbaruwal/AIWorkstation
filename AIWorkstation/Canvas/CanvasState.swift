@@ -66,6 +66,11 @@ final class CanvasState: ObservableObject {
         }
     }
 
+    /// The active theme's accent color. Chrome (command bar, selection, chips, empty
+    /// state) reads this instead of the fixed `Theme.accent`, so the whole UI retints
+    /// with the canvas theme — blue (Minimal), amber-teal (Futuristic), turquoise (Nature).
+    var accent: Color { canvasTheme.accent }
+
     private let defaults = UserDefaults.standard
     private enum Keys {
         static let sidebarPinned = "chrome.sidebarPinned"

@@ -60,7 +60,7 @@ struct SidebarView: View {
     private var header: some View {
         HStack(spacing: 8) {
             Circle()
-                .fill(Theme.accent.opacity(0.85))
+                .fill(state.accent.opacity(0.85))
                 .frame(width: 9, height: 9)
             Text("AI Workstation")
                 .font(.system(size: 13, weight: .semibold))
@@ -91,7 +91,7 @@ struct SidebarView: View {
                 Circle().fill(status.tint).frame(width: 6, height: 6)
                 Image(systemName: panel.isBrowser ? "globe" : panel.kind.glyph)
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(panel.isBrowser ? Theme.accent : panel.kind.tint)
+                    .foregroundStyle(panel.isBrowser ? state.accent : panel.kind.tint)
                 Text(panel.name.isEmpty ? panel.project : panel.name)
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(Theme.textPrimary)

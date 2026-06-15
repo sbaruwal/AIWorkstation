@@ -255,7 +255,7 @@ struct FocusModeView: View {
                 .textFieldStyle(.plain).font(.system(size: 12.5)).foregroundStyle(Theme.textPrimary)
                 .onSubmit(sendReprompt)
             Button(action: sendReprompt) {
-                Image(systemName: "arrow.up.circle.fill").font(.system(size: 19)).foregroundStyle(Theme.accent)
+                Image(systemName: "arrow.up.circle.fill").font(.system(size: 19)).foregroundStyle(state.accent)
             }.buttonStyle(.plain)
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
@@ -318,14 +318,14 @@ struct FocusModeView: View {
         switch file.status.first ?? " " {
         case "A": return SessionStatus.done.tint
         case "D": return SessionStatus.error.tint
-        default:  return Theme.accent
+        default:  return state.accent
         }
     }
 
     private func diffColor(_ line: String) -> Color {
         if line.hasPrefix("+") && !line.hasPrefix("+++") { return Color(red: 0.45, green: 0.85, blue: 0.55) }
         if line.hasPrefix("-") && !line.hasPrefix("---") { return Color(red: 0.95, green: 0.5, blue: 0.5) }
-        if line.hasPrefix("@@") { return Theme.accent }
+        if line.hasPrefix("@@") { return state.accent }
         if line.hasPrefix("diff ") || line.hasPrefix("+++") || line.hasPrefix("---") || line.hasPrefix("index ") { return Theme.textTertiary }
         return Theme.textSecondary
     }

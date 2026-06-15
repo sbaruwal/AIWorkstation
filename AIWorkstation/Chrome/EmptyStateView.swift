@@ -18,7 +18,7 @@ struct EmptyStateView: View {
             VStack(spacing: 8) {
                 Image(systemName: "square.on.square.dashed")
                     .font(.system(size: 34, weight: .ultraLight))
-                    .foregroundStyle(Theme.textSecondary)
+                    .foregroundStyle(state.accent.opacity(0.85))
                 Text(state.greeting)
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)
@@ -56,7 +56,7 @@ struct EmptyStateView: View {
                                 state.presentNewAgent(repo: url)
                             } label: {
                                 HStack(spacing: 5) {
-                                    Image(systemName: "arrow.triangle.branch").font(.system(size: 10)).foregroundStyle(Theme.accent)
+                                    Image(systemName: "arrow.triangle.branch").font(.system(size: 10)).foregroundStyle(state.accent)
                                     Text(url.lastPathComponent).font(.system(size: 11.5)).foregroundStyle(Theme.textSecondary).lineLimit(1)
                                 }
                                 .padding(.horizontal, 10).padding(.vertical, 5)
@@ -80,7 +80,7 @@ struct EmptyStateView: View {
         } label: {
             VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 6) {
-                    Image(systemName: "square.on.square").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.accent)
+                    Image(systemName: "square.on.square").font(.system(size: 11, weight: .semibold)).foregroundStyle(state.accent)
                     Text(ws.name.isEmpty ? "Untitled" : ws.name)
                         .font(.system(size: 12.5, weight: .semibold)).foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
@@ -98,9 +98,8 @@ struct EmptyStateView: View {
                     VisualEffectView(material: .hudWindow, blending: .behindWindow)
                     Theme.cardFill
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
-            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.cardStroke, lineWidth: 1))
+            .themedCardFrame(state.canvasTheme, accent: state.accent)
         }
         .buttonStyle(.plain)
         .help("Switch to \(ws.name)")
@@ -139,10 +138,8 @@ struct EmptyStateView: View {
                     VisualEffectView(material: .hudWindow, blending: .behindWindow)
                     Theme.cardFill
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Theme.cardStroke, lineWidth: 1))
+            .themedCardFrame(state.canvasTheme, accent: state.accent)
         }
         .buttonStyle(.plain)
     }

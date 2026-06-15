@@ -6,6 +6,7 @@ struct MinimapView: View {
     let panels: [PanelModel]
     let camera: Camera
     let viewportSize: CGSize
+    var accent: Color = Theme.accent
     var onNavigate: ((CGPoint) -> Void)? = nil
 
     private let mapSize = CGSize(width: 172, height: 116)
@@ -31,7 +32,7 @@ struct MinimapView: View {
                 let viewWorld = currentViewportWorldRect()
                 let vr = transform(viewWorld)
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .strokeBorder(Theme.accent.opacity(0.9), lineWidth: 1.2)
+                    .strokeBorder(accent.opacity(0.9), lineWidth: 1.2)
                     .frame(width: max(6, vr.width), height: max(6, vr.height))
                     .offset(x: vr.minX, y: vr.minY)
             }

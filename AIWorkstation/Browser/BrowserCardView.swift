@@ -25,12 +25,7 @@ struct BrowserCardView: View {
         }
         .frame(width: panel.width, height: panel.height)
         .background(cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cardCornerRadius, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.cardCornerRadius, style: .continuous)
-                .strokeBorder(isSelected ? Theme.cardStrokeSelected : Theme.cardStroke,
-                              lineWidth: isSelected ? 1.5 : 1)
-        )
+        .themedCardFrame(state.canvasTheme, isSelected: isSelected, accent: state.accent)
         .overlay(alignment: .bottomTrailing) { resizeHandle }
         .shadow(color: Theme.cardShadow, radius: isSelected ? 26 : 16, x: 0, y: 11)
         .onHover { hovering = $0 }
@@ -47,7 +42,7 @@ struct BrowserCardView: View {
         HStack(spacing: 6) {
             Image(systemName: "globe")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(state.accent)
             if !panel.name.isEmpty {
                 Text(panel.name).font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.textPrimary)
                 Text("·").font(.system(size: 11)).foregroundStyle(Theme.textTertiary)

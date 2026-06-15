@@ -57,7 +57,7 @@ struct TopToolbarView: View {
                 Image(systemName: state.toolbarPinned ? "pin.fill" : "pin")
             }
             .help(state.toolbarPinned ? "Unpin toolbar" : "Pin toolbar")
-            .buttonStyle(ChromeIconButtonStyle(tint: state.toolbarPinned ? Theme.accent : Theme.textSecondary))
+            .buttonStyle(ChromeIconButtonStyle(tint: state.toolbarPinned ? state.accent : Theme.textSecondary))
         }
         .buttonStyle(ChromeIconButtonStyle())
         .padding(.horizontal, 10)

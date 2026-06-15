@@ -10,9 +10,9 @@ struct CanvasBackgroundView: View {
     var body: some View {
         Group {
             switch theme {
-            case .minimal:     MinimalBackground(camera: camera)
-            case .liquidGlass: LiquidGlassBackground(camera: camera)
-            case .nature:      NatureBackground(camera: camera)
+            case .minimal:    MinimalBackground(camera: camera)
+            case .futuristic: FuturisticBackground(camera: camera)
+            case .nature:     NatureBackground(camera: camera)
             }
         }
         .ignoresSafeArea()
@@ -70,91 +70,214 @@ private struct DotGrid: View {
     }
 }
 
-// MARK: - Liquid Glass: futuristic iridescent fluid + glass sheen
+// MARK: - Futuristic: deep-space cockpit with a tactical HUD overlay
 
-private struct LiquidGlassBackground: View {
+private struct FuturisticBackground: View {
     let camera: Camera
-
-    private struct Blob { let color: Color; let center: UnitPoint; let radius: CGFloat; let parallax: CGFloat }
-
-    private let blobs: [Blob] = [
-        Blob(color: Color(red: 0.22, green: 0.85, blue: 0.95).opacity(0.34), center: .init(x: 0.22, y: 0.20), radius: 760, parallax: 0.06),
-        Blob(color: Color(red: 0.55, green: 0.32, blue: 0.98).opacity(0.32), center: .init(x: 0.80, y: 0.28), radius: 820, parallax: 0.05),
-        Blob(color: Color(red: 0.95, green: 0.35, blue: 0.78).opacity(0.22), center: .init(x: 0.66, y: 0.80), radius: 720, parallax: 0.045),
-        Blob(color: Color(red: 0.20, green: 0.52, blue: 1.0).opacity(0.30),  center: .init(x: 0.16, y: 0.84), radius: 760, parallax: 0.055)
-    ]
 
     var body: some View {
         ZStack {
+            // Deep hull / space gradient.
             LinearGradient(
-                colors: [Color(red: 0.02, green: 0.03, blue: 0.07),
-                         Color(red: 0.04, green: 0.05, blue: 0.11),
-                         Color(red: 0.02, green: 0.02, blue: 0.05)],
+                colors: [Color(red: 0.035, green: 0.05, blue: 0.10),
+                         Color(red: 0.05,  green: 0.07, blue: 0.13),
+                         Color(red: 0.02,  green: 0.03, blue: 0.07)],
                 startPoint: .topLeading, endPoint: .bottomTrailing
             )
 
-            // Fluid iridescent color fields, softened for a "liquid" feel.
-            ZStack {
-                ForEach(0..<blobs.count, id: \.self) { i in
-                    let b = blobs[i]
-                    RadialGradient(colors: [b.color, .clear], center: b.center, startRadius: 0, endRadius: b.radius)
-                        .offset(x: camera.pan.width * b.parallax, y: camera.pan.height * b.parallax)
-                        .blendMode(.screen)
-                }
+            Starfield(camera: camera)
+
+            // Distant planet with an atmospheric rim-light (lower-right, parallax).
+            GeometryReader { geo in
+                let d = max(geo.size.width, geo.size.height) * 0.85
+                Circle()
+                    .fill(RadialGradient(
+                        colors: [Color(red: 0.10, green: 0.14, blue: 0.20),
+                                 Color(red: 0.03, green: 0.05, blue: 0.09)],
+                        center: .init(x: 0.36, y: 0.34), startRadius: 0, endRadius: d * 0.62))
+                    .overlay(
+                        Circle().strokeBorder(
+                            AngularGradient(colors: [
+                                Color(red: 0.30, green: 0.85, blue: 0.95).opacity(0.0),
+                                Color(red: 0.30, green: 0.85, blue: 0.95).opacity(0.55),
+                                Color(red: 1.0,  green: 0.70, blue: 0.40).opacity(0.35),
+                                Color(red: 0.30, green: 0.85, blue: 0.95).opacity(0.0)],
+                                center: .center),
+                            lineWidth: 2.5)
+                            .blur(radius: 1.5)
+                    )
+                    .frame(width: d, height: d)
+                    .position(x: geo.size.width * 0.9, y: geo.size.height * 1.04)
+                    .offset(x: camera.pan.width * 0.02, y: camera.pan.height * 0.02)
             }
-            .blur(radius: 30)
 
-            // Glass specular sheen — a soft diagonal light sweep.
-            LinearGradient(
-                colors: [.clear, Color.white.opacity(0.10), .clear],
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            )
-            .blendMode(.softLight)
+            // Ambient HUD glows — amber + teal.
+            RadialGradient(colors: [Color(red: 1.0, green: 0.68, blue: 0.35).opacity(0.16), .clear],
+                           center: .init(x: 0.78, y: 0.20), startRadius: 0, endRadius: 460)
+                .offset(x: camera.pan.width * 0.03, y: camera.pan.height * 0.03)
+                .blendMode(.screen)
+            RadialGradient(colors: [Color(red: 0.25, green: 0.78, blue: 0.92).opacity(0.18), .clear],
+                           center: .init(x: 0.18, y: 0.82), startRadius: 0, endRadius: 520)
+                .offset(x: camera.pan.width * 0.025, y: camera.pan.height * 0.025)
+                .blendMode(.screen)
 
-            // Vignette for depth.
-            RadialGradient(colors: [.clear, Color.black.opacity(0.40)], center: .center, startRadius: 300, endRadius: 1050)
+            // Fixed cockpit HUD overlay (tactical grid, perspective floor, brackets, reticle).
+            HUDOverlay()
+
+            // Subtle vignette.
+            RadialGradient(colors: [.clear, Color.black.opacity(0.42)], center: .center, startRadius: 320, endRadius: 1080)
         }
     }
 }
 
-// MARK: - Nature: aurora sky over layered ridges
+/// Vector HUD drawn over the scene like cockpit glass — fixed (no parallax) so it
+/// reads as a heads-up display you're looking *through*.
+private struct HUDOverlay: View {
+    private let teal = Color(red: 0.31, green: 0.82, blue: 0.90)
+    private let amber = Color(red: 1.0, green: 0.69, blue: 0.38)
+
+    var body: some View {
+        Canvas { ctx, size in
+            // 1) Faint tactical grid.
+            var grid = Path()
+            let step: CGFloat = 70
+            var x = step
+            while x < size.width { grid.move(to: CGPoint(x: x, y: 0)); grid.addLine(to: CGPoint(x: x, y: size.height)); x += step }
+            var y = step
+            while y < size.height { grid.move(to: CGPoint(x: 0, y: y)); grid.addLine(to: CGPoint(x: size.width, y: y)); y += step }
+            ctx.stroke(grid, with: .color(teal.opacity(0.045)), lineWidth: 0.5)
+
+            // 2) Perspective "floor" grid receding to a vanishing point — the sci-fi cue.
+            let vp = CGPoint(x: size.width * 0.5, y: size.height * 0.46)
+            var floor = Path()
+            var fx: CGFloat = 0
+            while fx <= size.width { floor.move(to: CGPoint(x: fx, y: size.height)); floor.addLine(to: vp); fx += 110 }
+            var t: CGFloat = 0.10
+            while t < 1.0 {
+                let yy = vp.y + (size.height - vp.y) * t * t   // ease so lines bunch near the horizon
+                floor.move(to: CGPoint(x: 0, y: yy)); floor.addLine(to: CGPoint(x: size.width, y: yy))
+                t += 0.14
+            }
+            ctx.stroke(floor, with: .color(teal.opacity(0.06)), lineWidth: 0.5)
+
+            // 3) Corner brackets.
+            let m: CGFloat = 16, arm: CGFloat = 26
+            var br = Path()
+            br.move(to: CGPoint(x: m, y: m + arm)); br.addLine(to: CGPoint(x: m, y: m)); br.addLine(to: CGPoint(x: m + arm, y: m))
+            br.move(to: CGPoint(x: size.width - m - arm, y: m)); br.addLine(to: CGPoint(x: size.width - m, y: m)); br.addLine(to: CGPoint(x: size.width - m, y: m + arm))
+            br.move(to: CGPoint(x: m, y: size.height - m - arm)); br.addLine(to: CGPoint(x: m, y: size.height - m)); br.addLine(to: CGPoint(x: m + arm, y: size.height - m))
+            br.move(to: CGPoint(x: size.width - m - arm, y: size.height - m)); br.addLine(to: CGPoint(x: size.width - m, y: size.height - m)); br.addLine(to: CGPoint(x: size.width - m, y: size.height - m - arm))
+            ctx.stroke(br, with: .color(teal.opacity(0.5)), lineWidth: 1.5)
+
+            // 4) Targeting reticle (upper-right).
+            let rc = CGPoint(x: size.width * 0.8, y: size.height * 0.2)
+            var ring = Path(); ring.addEllipse(in: CGRect(x: rc.x - 28, y: rc.y - 28, width: 56, height: 56))
+            ctx.stroke(ring, with: .color(amber.opacity(0.6)), lineWidth: 1)
+            var ticks = Path()
+            ticks.move(to: CGPoint(x: rc.x, y: rc.y - 34)); ticks.addLine(to: CGPoint(x: rc.x, y: rc.y - 22))
+            ticks.move(to: CGPoint(x: rc.x, y: rc.y + 22)); ticks.addLine(to: CGPoint(x: rc.x, y: rc.y + 34))
+            ticks.move(to: CGPoint(x: rc.x - 34, y: rc.y)); ticks.addLine(to: CGPoint(x: rc.x - 22, y: rc.y))
+            ticks.move(to: CGPoint(x: rc.x + 22, y: rc.y)); ticks.addLine(to: CGPoint(x: rc.x + 34, y: rc.y))
+            ctx.stroke(ticks, with: .color(amber.opacity(0.6)), lineWidth: 1)
+            ctx.fill(Path(ellipseIn: CGRect(x: rc.x - 2.5, y: rc.y - 2.5, width: 5, height: 5)), with: .color(amber.opacity(0.85)))
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Nature: a user-supplied photo (Backdrops/nature.*) over a dark scrim,
+// falling back to an original procedural scene when no image is present.
 
 private struct NatureBackground: View {
     let camera: Camera
 
+    /// Loaded once. A photo at `Backdrops/nature.{jpg,jpeg,png,heic}` wins; otherwise
+    /// the procedural scene is used (so the repo ships with no bundled/licensed image).
+    private static let photo: NSImage? = {
+        let dir = WorkspaceStore.shared.backdropsDir
+        for name in ["nature.jpg", "nature.jpeg", "nature.png", "nature.heic"] {
+            if let img = NSImage(contentsOfFile: dir.appendingPathComponent(name).path) { return img }
+        }
+        return nil
+    }()
+
+    var body: some View {
+        if let photo = Self.photo {
+            ZStack {
+                GeometryReader { geo in
+                    Image(nsImage: photo)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: geo.size.width * 1.12, height: geo.size.height * 1.12)
+                        .offset(x: camera.pan.width * 0.02 - geo.size.width * 0.06,
+                                y: camera.pan.height * 0.02 - geo.size.height * 0.06)
+                        .clipped()
+                }
+                // Scrim so the glass cards + text stay legible over a bright photo.
+                LinearGradient(colors: [Color.black.opacity(0.42), Color.black.opacity(0.12), Color.black.opacity(0.50)],
+                               startPoint: .top, endPoint: .bottom)
+                RadialGradient(colors: [.clear, Color.black.opacity(0.32)], center: .center, startRadius: 260, endRadius: 1000)
+            }
+        } else {
+            ProceduralNature(camera: camera)
+        }
+    }
+}
+
+// MARK: - Procedural nature fallback: aurora sky over layered ridges
+
+private struct ProceduralNature: View {
+    let camera: Camera
+
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Sky
+            // Sky — deep night-blue up top, easing into a teal horizon.
             LinearGradient(
-                colors: [Color(red: 0.03, green: 0.05, blue: 0.13),
-                         Color(red: 0.04, green: 0.09, blue: 0.18),
-                         Color(red: 0.05, green: 0.15, blue: 0.18)],
+                colors: [Color(red: 0.03, green: 0.05, blue: 0.14),
+                         Color(red: 0.04, green: 0.10, blue: 0.20),
+                         Color(red: 0.06, green: 0.17, blue: 0.20)],
                 startPoint: .top, endPoint: .bottom
             )
 
-            // Aurora band (upper third)
-            RadialGradient(colors: [Color(red: 0.25, green: 0.85, blue: 0.6).opacity(0.30),
-                                    Color(red: 0.30, green: 0.55, blue: 0.9).opacity(0.16), .clear],
-                           center: .init(x: 0.45, y: 0.22), startRadius: 0, endRadius: 520)
-                .offset(x: camera.pan.width * 0.03, y: camera.pan.height * 0.03)
-                .blendMode(.screen)
-                .blur(radius: 24)
-
             Starfield(camera: camera)
 
-            // Layered ridges, far → near (bluer/lighter back, darker green front)
-            RidgeShape(baseline: 0.58, amplitude: 40, frequency: 1.7, phase: 0.3)
-                .fill(Color(red: 0.08, green: 0.16, blue: 0.28))
+            // Warm low sun/moon glow near the horizon — the anchor that makes it read
+            // as a real landscape rather than an abstract gradient.
+            RadialGradient(colors: [Color(red: 1.0, green: 0.84, blue: 0.55).opacity(0.26),
+                                    Color(red: 0.95, green: 0.58, blue: 0.40).opacity(0.10), .clear],
+                           center: .init(x: 0.66, y: 0.56), startRadius: 0, endRadius: 360)
+                .offset(x: camera.pan.width * 0.02, y: camera.pan.height * 0.02)
+                .blendMode(.screen)
+                .blur(radius: 18)
+
+            // Faint aurora veil, higher up.
+            RadialGradient(colors: [Color(red: 0.25, green: 0.85, blue: 0.6).opacity(0.18), .clear],
+                           center: .init(x: 0.40, y: 0.20), startRadius: 0, endRadius: 480)
+                .offset(x: camera.pan.width * 0.03, y: camera.pan.height * 0.03)
+                .blendMode(.screen)
+                .blur(radius: 30)
+
+            // Atmospheric haze band sitting along the ridgeline (distance softening).
+            LinearGradient(colors: [.clear, Color(red: 0.5, green: 0.7, blue: 0.75).opacity(0.10), .clear],
+                           startPoint: .top, endPoint: .bottom)
+                .frame(height: 240)
+                .frame(maxHeight: .infinity, alignment: .center)
+                .offset(y: 30)
+
+            // Layered ridges, far → near. Atmospheric perspective: hazy blue-grey in the
+            // distance, deep green up close — far layers lose contrast like real haze.
+            RidgeShape(baseline: 0.56, amplitude: 38, frequency: 1.7, phase: 0.3)
+                .fill(Color(red: 0.17, green: 0.30, blue: 0.40))
                 .offset(x: camera.pan.width * 0.018)
             RidgeShape(baseline: 0.70, amplitude: 52, frequency: 1.2, phase: 2.0)
-                .fill(Color(red: 0.06, green: 0.16, blue: 0.20))
+                .fill(Color(red: 0.10, green: 0.22, blue: 0.27))
                 .offset(x: camera.pan.width * 0.03)
-            RidgeShape(baseline: 0.84, amplitude: 46, frequency: 0.9, phase: 4.1)
-                .fill(Color(red: 0.04, green: 0.14, blue: 0.11))
+            RidgeShape(baseline: 0.85, amplitude: 48, frequency: 0.9, phase: 4.1)
+                .fill(Color(red: 0.05, green: 0.15, blue: 0.12))
                 .offset(x: camera.pan.width * 0.045)
 
-            // Ground mist
-            LinearGradient(colors: [.clear, Color(red: 0.10, green: 0.28, blue: 0.20).opacity(0.45)],
+            // Ground mist.
+            LinearGradient(colors: [.clear, Color(red: 0.12, green: 0.30, blue: 0.22).opacity(0.5)],
                            startPoint: .center, endPoint: .bottom)
                 .blendMode(.screen)
         }
