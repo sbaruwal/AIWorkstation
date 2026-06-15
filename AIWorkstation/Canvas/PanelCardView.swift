@@ -21,6 +21,7 @@ struct PanelCardView: View {
     @State private var renaming = false
     @State private var editName = ""
     @State private var pulse = false
+    @State private var answerText = ""
     @FocusState private var renameFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -31,6 +32,26 @@ struct PanelCardView: View {
     /// True while output is actively streaming — drives the subtle "working" pulse
     /// on the status dot so an active agent reads as alive at a glance.
     private var isWorking: Bool { displayStatus == .working }
+
+    /// Header status text, plus a live "how long" duration for the states where it
+    /// matters (waiting on you / blocked / errored). Blocked is tinted to catch the eye.
+    @ViewBuilder private var statusLabel: some View {
+        let s = displayStatus
+        HStack(spacing: 5) {
+            Text(s.label)
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(s == .blocked ? s.tint : Theme.textSecondary)
+            if s == .waiting || s == .blocked || s == .error {
+                TimelineView(.periodic(from: .now, by: 15)) { ctx in
+                    if let d = TerminalController.durationLabel(since: terminal.statusSince, now: ctx.date) {
+                        Text(d)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Theme.textTertiary)
+                    }
+                }
+            }
+        }
+    }
 
     /// Status dot with a radar-style pulse while working (suppressed under
     /// Reduce Motion — the color alone still conveys the state).
@@ -117,9 +138,7 @@ struct PanelCardView: View {
                 headerButton("arrow.clockwise", help: "Restart session") { terminal.restart() }
                 headerButton("xmark", help: "Close panel") { state.removePanel(panel.id) }
             } else {
-                Text(displayStatus.label)
-                    .font(.system(size: 10.5, weight: .medium))
-                    .foregroundStyle(Theme.textSecondary)
+                statusLabel
             }
         }
         .padding(.horizontal, 12)
@@ -220,6 +239,83 @@ struct PanelCardView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Inline answer affordance: when the agent is blocked on a question, let you
+        // reply right on the card (or with a Yes/No chip) without entering Focus Mode.
+        // Hidden while focused — Focus Mode has its own composer. Never auto-answers.
+        .overlay(alignment: .bottom) {
+            if terminal.needsInput, state.focusedPanel != panel.id {
+                answerBar.transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.18), value: terminal.needsInput)
+    }
+
+    // MARK: Inline answer bar (blocked agents)
+
+    private var isYesNoPrompt: Bool {
+        guard let q = terminal.pendingQuestion?.lowercased() else { return false }
+        return q.contains("y/n") || q.contains("yes/no") || q.contains("(y") || q.contains("[y")
+    }
+
+    private var answerBar: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let q = terminal.pendingQuestion, !q.isEmpty {
+                Text(q)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            HStack(spacing: 6) {
+                if isYesNoPrompt {
+                    answerChip("Yes") { sendAnswer("y") }
+                    answerChip("No")  { sendAnswer("n") }
+                }
+                TextField("Reply…", text: $answerText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.textPrimary)
+                    .onSubmit(submitAnswer)
+                    .padding(.horizontal, 9).padding(.vertical, 5)
+                    .background(Color.black.opacity(0.25), in: Capsule())
+                Button(action: submitAnswer) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 17))
+                        .foregroundStyle(SessionStatus.blocked.tint)
+                }
+                .buttonStyle(.plain)
+                .disabled(answerText.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(.horizontal, 10).padding(.vertical, 8)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .top) {
+            Rectangle().fill(SessionStatus.blocked.tint.opacity(0.5)).frame(height: 1)
+        }
+    }
+
+    private func answerChip(_ label: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.textPrimary)
+                .padding(.horizontal, 11).padding(.vertical, 5)
+                .background(SessionStatus.blocked.tint.opacity(0.18), in: Capsule())
+                .overlay(Capsule().strokeBorder(SessionStatus.blocked.tint.opacity(0.45), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func submitAnswer() {
+        let t = answerText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        sendAnswer(t)
+        answerText = ""
+    }
+
+    /// Push the user's chosen answer into the live PTY (their tap/Enter — never automatic).
+    private func sendAnswer(_ text: String) {
+        terminal.sendInput(text, submit: true)
     }
 
     private func exitedOverlay(status: ExitStatus) -> some View {

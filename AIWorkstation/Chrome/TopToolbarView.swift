@@ -25,6 +25,8 @@ struct TopToolbarView: View {
 
             divider
 
+            attentionBadge
+
             // Launch a real Claude / Codex agent: pick a repo, start the CLI there.
             toolButton("plus", help: "New Claude agent") {
                 launchAgent(.claude)
@@ -76,6 +78,43 @@ struct TopToolbarView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This closes its \(state.workspace.panels.count) card\(state.workspace.panels.count == 1 ? "" : "s") and ends any running sessions.")
+        }
+    }
+
+    /// Ambient "N agents need you" pill — hidden when zero (the canvas stays calm).
+    /// Tinted by the most urgent reason present (red crash · orange blocked · amber
+    /// waiting · blue done). Clicking opens the Attention Inbox (the cross-canvas queue;
+    /// the inbox / ⌃⌥→ is what jumps to a specific agent). Polls on a light 2s timer to
+    /// avoid nested-observable plumbing for a count that can lag a moment harmlessly.
+    @ViewBuilder private var attentionBadge: some View {
+        TimelineView(.periodic(from: .now, by: 2)) { _ in
+            let waiting = state.agentsNeedingAttention()
+            if let worst = waiting.first {
+                HStack(spacing: 6) {
+                    Button {
+                        state.openAttentionInbox()
+                    } label: {
+                        HStack(spacing: 5) {
+                            Circle().fill(worst.status.tint).frame(width: 7, height: 7)
+                            Text("\(waiting.count)")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(Theme.textPrimary)
+                            Text(waiting.count == 1 ? "needs you" : "need you")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background(worst.status.tint.opacity(0.14), in: Capsule())
+                        .overlay(Capsule().strokeBorder(worst.status.tint.opacity(0.40), lineWidth: 1))
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .help("\(waiting.count) agent\(waiting.count == 1 ? "" : "s") waiting on you — open the inbox")
+
+                    divider
+                }
+            }
         }
     }
 

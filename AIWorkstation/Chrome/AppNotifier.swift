@@ -31,6 +31,9 @@ final class AppNotifier: ObservableObject {
         let title: String
         let body: String?
         let kind: Kind
+        /// Optional tap action — e.g. jump to the agent that needs you. Equatable by id,
+        /// so the closure doesn't affect identity/diffing.
+        var onTap: (() -> Void)?
         static func == (a: Toast, b: Toast) -> Bool { a.id == b.id }
     }
 
@@ -42,9 +45,10 @@ final class AppNotifier: ObservableObject {
 
     /// Post an in-app toast and (best-effort) a macOS local notification.
     /// `system: false` skips the OS notification for low-signal events.
-    func post(_ title: String, body: String? = nil, kind: Kind = .info, system: Bool = true) {
+    func post(_ title: String, body: String? = nil, kind: Kind = .info, system: Bool = true,
+              onTap: (() -> Void)? = nil) {
         guard enabled else { return }
-        let toast = Toast(title: title, body: body, kind: kind)
+        let toast = Toast(title: title, body: body, kind: kind, onTap: onTap)
         withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
             toasts.append(toast)
             // Cap the visible stack so a burst can't bury the canvas.

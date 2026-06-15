@@ -73,11 +73,39 @@ final class TerminalController: NSObject, ObservableObject, LocalProcessTerminal
     private(set) var workingDirectory: String?
     let terminalView: ActivityLocalTerminalView
 
-    @Published private(set) var runState: RunState = .idle
+    @Published private(set) var runState: RunState = .idle { didSet { refreshStatusStamp() } }
     @Published private(set) var title: String = ""
     /// Whether output is actively flowing right now. Drives the live "Working" dot
     /// and the canvas activity pulse. Flips to `.quiet` after a short idle gap.
-    @Published private(set) var activity: Activity = .quiet
+    @Published private(set) var activity: Activity = .quiet { didSet { refreshStatusStamp() } }
+
+    /// True when a quiet, running agent appears to be awaiting an answer to a prompt
+    /// (a y/n, a menu choice, a permission/trust question) rather than just sitting idle.
+    /// Derived by `classifyQuietState()` from the visible terminal tail on each quiet-flip;
+    /// drives the `.blocked` status, the attention badge/inbox, and handoff notifications.
+    @Published private(set) var needsInput = false {
+        didSet {
+            refreshStatusStamp()
+            // Notify once per DISTINCT unresolved prompt. A TUI redraw flips needsInput
+            // false→true for the SAME question (output re-arms the edge), which must not
+            // re-notify; `lastNotifiedQuestion` is cleared only when the prompt resolves.
+            if needsInput, !oldValue, pendingQuestion != lastNotifiedQuestion {
+                lastNotifiedQuestion = pendingQuestion
+                onNeedsInput?(pendingQuestion)
+            }
+        }
+    }
+    /// The question we last fired a handoff notification for — dedupes redraws of the
+    /// same prompt. Cleared in `classifyQuietState` when the screen is no longer blocked.
+    private var lastNotifiedQuestion: String?
+    /// The question the agent is asking, when `needsInput` — for notifications + inline reply.
+    @Published private(set) var pendingQuestion: String?
+
+    /// When the current `displayStatus` VALUE began — drives "waiting 9m" badges. Updated
+    /// only on a real status transition (not on every output burst), so the duration
+    /// reflects how long the agent has been in *this* state.
+    private(set) var statusSince = Date()
+    private var lastStampedStatus: SessionStatus = .idle
 
     /// Re-armed each time output arrives; fires after a quiet gap to flip to `.quiet`.
     private var quietWork: DispatchWorkItem?
@@ -96,6 +124,9 @@ final class TerminalController: NSObject, ObservableObject, LocalProcessTerminal
     var onExit: ((ExitStatus, _ userInitiated: Bool) -> Void)?
     /// Fired once when launch is blocked because the CLI binary couldn't be located.
     var onNeedsCLI: ((AgentKind) -> Void)?
+    /// Fired when a quiet agent starts awaiting an answer to a prompt (false→true), with
+    /// the question text — drives handoff notifications. Once per blocked episode.
+    var onNeedsInput: ((String?) -> Void)?
     /// Set just before WE terminate the PTY (close/restart) so the resulting exit
     /// isn't reported as an unexpected finish.
     private var userInitiatedExit = false
@@ -234,10 +265,16 @@ final class TerminalController: NSObject, ObservableObject, LocalProcessTerminal
     /// churn during a fast output burst.
     private func noteActivity() {
         if activity != .working { activity = .working }
+        // Output resumed → the agent is no longer parked on a question.
+        if needsInput { needsInput = false; pendingQuestion = nil }
         quietWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
-            self?.activity = .quiet
-            self?.quietWork = nil
+            guard let self else { return }
+            // Classify the now-settled screen BEFORE publishing .quiet so the UI reads a
+            // consistent (.quiet + needsInput) pair in one pass.
+            self.classifyQuietState()
+            self.activity = .quiet
+            self.quietWork = nil
         }
         quietWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.quietGap, execute: work)
@@ -248,6 +285,105 @@ final class TerminalController: NSObject, ObservableObject, LocalProcessTerminal
         quietWork?.cancel()
         quietWork = nil
         if activity != .quiet { activity = .quiet }
+        if needsInput { needsInput = false }
+        if pendingQuestion != nil { pendingQuestion = nil }
+    }
+
+    // MARK: Waiting-reason classifier (blocked-on-a-question vs idle/ready)
+
+    /// On a quiet-flip, read the visible terminal tail to decide whether this agent is
+    /// awaiting an answer to a prompt (→ `.blocked`/`needsInput`) vs simply idle/ready.
+    /// Reads SwiftTerm's ALREADY-PARSED buffer (`getLine`/`translateToString`) — never
+    /// re-emulates ANSI, per the locked constraint.
+    private func classifyQuietState() {
+        guard kind != .shell, runState == .running else {
+            if needsInput { needsInput = false }
+            if pendingQuestion != nil { pendingQuestion = nil }
+            return
+        }
+        let term = terminalView.getTerminal()
+        let rows = term.rows
+        var lines: [String] = []
+        lines.reserveCapacity(max(0, rows))
+        for r in 0..<rows {
+            lines.append(term.getLine(row: r)?.translateToString(trimRight: true) ?? "")
+        }
+        let (blocked, question) = Self.classifyTail(lines)
+        // Set the question BEFORE needsInput, so needsInput's didSet sees the current
+        // question when it fires the handoff callback.
+        let newQuestion = blocked ? question : nil
+        if pendingQuestion != newQuestion { pendingQuestion = newQuestion }
+        if !blocked { lastNotifiedQuestion = nil }   // prompt resolved → allow a future notify
+        if needsInput != blocked { needsInput = blocked }
+    }
+
+    /// Pure heuristic (so it's unit-testable): given the visible terminal lines
+    /// (top→bottom), decide whether an agent is asking the user something and what.
+    /// Conservative — a missed question still reads as "Waiting", a false positive only
+    /// over-reports attention; either way it degrades gracefully.
+    static func classifyTail(_ visibleLines: [String]) -> (blocked: Bool, question: String?) {
+        let lines = visibleLines
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .suffix(14)
+            .map { String($0) }
+        guard let last = lines.last else { return (false, nil) }
+        let hay = lines.joined(separator: "\n").lowercased()
+        func question() -> String? { lines.last { $0.hasSuffix("?") && $0.count <= 200 } }
+
+        // 1) Explicit yes/no confirmation tokens.
+        if ["(y/n)", "[y/n]", "(yes/no)", "[yes/no]", "y/n]", "(y/n/", "[y/n/"].contains(where: hay.contains) {
+            return (true, question() ?? last)
+        }
+        // 2) Interactive selection MENU — a cursor glyph (❯ ▶ ‣ ›) that's a real choice
+        // list, NOT the idle composer. A menu has either a numbered option line (optionally
+        // cursor-prefixed: "❯ 1. Yes") or 2+ cursor lines. Claude Code's idle ready prompt
+        // ("❯Try \"refactor …\"") is a lone glyph with neither, so it stays "waiting".
+        let glyphLines = lines.filter { $0.contains("❯") || $0.contains("▶") || $0.contains("‣") || $0.contains("›") }
+        let hasNumberedOption = lines.contains {
+            $0.range(of: #"^\s*[❯▶‣›]?\s*\d[.)]\s"#, options: .regularExpression) != nil
+        }
+        if !glyphLines.isEmpty, glyphLines.count >= 2 || hasNumberedOption {
+            return (true, question() ?? "Select an option")
+        }
+        // 3) Permission / confirmation language, checked only in the prompt region (last few
+        // lines) so ordinary completion output earlier on screen ("Approved 3 files") can't
+        // match. Past-tense-prone words (approve/confirm) are intentionally omitted — the
+        // real interrogative cases are caught by the y/n (1) and trailing-? (4) rules.
+        let promptRegion = lines.suffix(4).joined(separator: "\n").lowercased()
+        let ask = ["do you want", "do you trust", "would you like", "proceed?", "continue?",
+                   "allow this", "grant access", "press enter to continue",
+                   "select an option", "overwrite?", "are you sure", "[enter] to"]
+        if ask.contains(where: promptRegion.contains) {
+            return (true, question() ?? last)
+        }
+        // 4) A trailing question line ending in '?'.
+        if last.hasSuffix("?"), last.count <= 200 {
+            return (true, last)
+        }
+        return (false, nil)
+    }
+
+    // MARK: Time-in-status
+
+    /// Re-stamp `statusSince` when (and only when) the visible status changes. Called from
+    /// the didSet of every input to `displayStatus` (runState / activity / needsInput), so
+    /// a fast output burst that doesn't change the status leaves the clock running.
+    private func refreshStatusStamp() {
+        let now = displayStatus
+        guard now != lastStampedStatus else { return }
+        lastStampedStatus = now
+        statusSince = Date()
+    }
+
+    /// Compact "time in status" label, e.g. "12s", "4m", "1h 3m". Nil under 3s (too noisy).
+    static func durationLabel(since: Date, now: Date = Date()) -> String? {
+        let s = Int(now.timeIntervalSince(since))
+        if s < 3 { return nil }
+        if s < 60 { return "\(s)s" }
+        let m = s / 60
+        if m < 60 { return "\(m)m" }
+        return "\(m / 60)h \(m % 60)m"
     }
 
     /// Single-quote a string for safe use in the shell command we hand to zsh.
@@ -275,7 +411,8 @@ final class TerminalController: NSObject, ObservableObject, LocalProcessTerminal
             return .working                       // async worktree checkout in flight
         case .running:
             if activity == .working { return .working }
-            return (kind == .shell) ? .idle : .waiting
+            if kind == .shell { return .idle }
+            return needsInput ? .blocked : .waiting   // asking you vs idle/ready
         case .exited(let status):
             return status.isClean ? .done : .error
         case .needsCLI:

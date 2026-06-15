@@ -36,7 +36,7 @@ struct ToastOverlayView: View {
                 }
             }
 
-            Image(systemName: "xmark")
+            Image(systemName: toast.onTap == nil ? "xmark" : "arrow.up.right")
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(Theme.textTertiary)
                 .padding(.leading, 2)
@@ -57,6 +57,9 @@ struct ToastOverlayView: View {
         )
         .shadow(color: Theme.cardShadow, radius: 16, y: 7)
         .contentShape(Rectangle())
-        .onTapGesture { notifier.dismiss(toast.id) }
+        .onTapGesture {
+            toast.onTap?()              // e.g. jump to the agent; nil → just dismiss
+            notifier.dismiss(toast.id)
+        }
     }
 }

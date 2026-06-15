@@ -42,6 +42,7 @@ struct CommandCheatsheetView: View {
                             ("\(sampleName) <url>", "Point that browser at a site"),
                             ("tell \(sampleName) <message>", "Same as above, spelled out"),
                             ("@\(sampleName) <message>", "Or  \(sampleName.lowercased()): <message>"),
+                            ("tell all <message>", "Broadcast to running agents on this canvas"),
                         ]
                     )
                     section(

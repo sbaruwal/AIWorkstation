@@ -246,6 +246,10 @@ struct CanvasView: View {
             CommandPaletteView(state: state, viewport: viewport)
                 .zIndex(100)
         }
+        if state.showAttentionInbox {
+            AttentionInboxView(state: state)
+                .zIndex(250)   // above Focus Mode — triage from anywhere
+        }
         if state.showOnboarding {
             OnboardingView(state: state)
                 .zIndex(300)
@@ -266,6 +270,10 @@ struct CanvasView: View {
                 .keyboardShortcut("n", modifiers: [.command, .shift])
             Button("") { state.showCommandPalette.toggle() }
                 .keyboardShortcut("k", modifiers: .command)
+            Button("") { state.showAttentionInbox.toggle() }
+                .keyboardShortcut("i", modifiers: .command)
+            Button("") { state.jumpToNextAttention() }
+                .keyboardShortcut(.rightArrow, modifiers: [.control, .option])   // not ⌥⇧→ (word-select)
             Button("") { state.centerWorkspace(viewportSize: viewport) }   // Fit to all
                 .keyboardShortcut("0", modifiers: .command)
             Button("") { withAnimation { state.autoTidy(viewportSize: viewport) } }
@@ -291,7 +299,8 @@ struct CanvasView: View {
     }
 
     private func dismissTopMostOrDeselect() {
-        if state.showCommandPalette { state.showCommandPalette = false }
+        if state.showAttentionInbox { state.showAttentionInbox = false }
+        else if state.showCommandPalette { state.showCommandPalette = false }
         else if state.newAgentDraft != nil { state.newAgentDraft = nil }
         else if state.focusedPanel != nil { state.exitFocus() }
         else { state.selection = nil }

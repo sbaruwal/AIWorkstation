@@ -57,6 +57,7 @@ enum SessionStatus: String, Codable, CaseIterable {
     case idle
     case working
     case waiting
+    case blocked    // a running agent that's asking you something (awaiting input)
     case error
     case done
 
@@ -65,6 +66,7 @@ enum SessionStatus: String, Codable, CaseIterable {
         case .idle:    return "Idle"
         case .working: return "Working"
         case .waiting: return "Waiting"
+        case .blocked: return "Needs you"
         case .error:   return "Error"
         case .done:    return "Done"
         }

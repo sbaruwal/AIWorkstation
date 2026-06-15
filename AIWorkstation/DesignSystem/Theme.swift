@@ -76,6 +76,7 @@ extension SessionStatus {
         case .idle:    return Color.white.opacity(0.45)
         case .working: return Color(red: 0.36, green: 0.80, blue: 0.52)
         case .waiting: return Color(red: 0.95, green: 0.74, blue: 0.32)
+        case .blocked: return Color(red: 0.98, green: 0.56, blue: 0.26)   // urgent orange — asking you
         case .error:   return Color(red: 0.95, green: 0.42, blue: 0.42)
         case .done:    return Color(red: 0.45, green: 0.62, blue: 1.0)
         }

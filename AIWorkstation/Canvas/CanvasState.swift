@@ -212,6 +212,9 @@ final class CanvasState: ObservableObject {
                                    body: "Locate the binary in Settings to launch \(self.panelName(for: cid)).",
                                    kind: .error)
             }
+            controller.onNeedsInput = { [weak self] question in
+                self?.handleAgentNeedsInput(id: cid, question: question)
+            }
         }
 
         // Debounced autosave: every change to any canvas / the current selection /
@@ -549,6 +552,17 @@ final class CanvasState: ObservableObject {
         }
     }
 
+    /// A running agent just started awaiting an answer (the classifier flipped it to
+    /// blocked). Surface a typed toast + OS notification whose tap jumps to the agent —
+    /// so a question 10 minutes deep doesn't sit silent while you're in another app.
+    private func handleAgentNeedsInput(id: UUID, question: String?) {
+        let name = panelName(for: id)
+        let q = question?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let body = (q?.isEmpty == false) ? q : "is waiting for your input."
+        notifier.post("\(name) needs you", body: body, kind: .info,
+                      onTap: { [weak self] in self?.revealAgent(id) })
+    }
+
     // MARK: Session controls
 
     func renamePanel(_ id: UUID, to name: String) {
@@ -558,6 +572,7 @@ final class CanvasState: ObservableObject {
         // unique (case-insensitive) — a duplicate would make a node unaddressable and
         // could mis-target a destructive `close <name>`.
         let lower = trimmed.lowercased()
+        guard lower != "all" else { return }   // reserved: "all" is the broadcast keyword
         guard !workspace.panels.contains(where: { $0.id != id && $0.name.lowercased() == lower }) else { return }
         workspace.panels[idx].name = trimmed   // the addressable node name
     }
@@ -647,7 +662,25 @@ final class CanvasState: ObservableObject {
             launchFromCommandBar(kind: kind, repoURL: target, task: task, autoRun: autoRun, viewportSize: viewportSize)
         case .control(let name, let action):
             applyControl(name: name, action: action)
+        case .broadcast(let message):
+            broadcastToAgents(message)
         }
+    }
+
+    /// Fan a user-typed follow-up to every RUNNING agent on the current canvas ("tell all
+    /// run the tests"). Pure fan-out of the user's own message — never autonomous, and
+    /// scoped to live agents so a broadcast can't silently wake dead/recoverable sessions.
+    func broadcastToAgents(_ message: String) {
+        let targets = workspace.panels.filter {
+            !$0.isBrowser && terminals.existingController(for: $0.id)?.runState == .running
+        }
+        guard !targets.isEmpty else {
+            notifier.post("No running agents", body: "Nothing to broadcast to.", kind: .info, system: false)
+            return
+        }
+        for panel in targets { deliverToAgent(panel, message: message) }
+        notifier.post("Sent to \(targets.count) agent\(targets.count == 1 ? "" : "s") on this canvas",
+                      body: message, kind: .success, system: false)
     }
 
     /// Focus-mode composer. A plain message is a follow-up to the focused agent; a
@@ -676,6 +709,8 @@ final class CanvasState: ObservableObject {
                 launchFromCommandBar(kind: kind, repoURL: target, task: task, autoRun: true, viewportSize: viewportSize)
             case .control(let name, let action):
                 applyControl(name: name, action: action)
+            case .broadcast(let message):
+                broadcastToAgents(message)
             }
         } else if let panel = panel(focusedId) {
             deliverToAgent(panel, message: text)   // plain prose → follow-up to this agent
@@ -837,6 +872,8 @@ final class CanvasState: ObservableObject {
 
     @Published var newAgentDraft: NewAgentDraft?
     @Published var showCommandPalette = false
+    /// The Attention Inbox (⌘I) — the cross-canvas queue of agents needing a human.
+    @Published var showAttentionInbox = false
     @Published var focusedPanel: UUID? {
         didSet {
             guard focusedPanel != oldValue else { return }
@@ -860,6 +897,96 @@ final class CanvasState: ObservableObject {
 
     func exitFocus() {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { focusedPanel = nil }
+    }
+
+    // MARK: Attention aggregation (the "N need you" badge + the Attention Inbox)
+
+    /// An agent (on any canvas) that currently wants a human, with the reason.
+    struct AgentAttention: Identifiable {
+        let panel: PanelModel
+        let workspaceID: UUID
+        let workspaceName: String
+        let status: SessionStatus
+        var id: UUID { panel.id }
+    }
+
+    /// Urgency order for the attention set; nil = not in the set (busy or idle). error first.
+    static func attentionRank(_ s: SessionStatus) -> Int? {
+        switch s {
+        case .error:   return 0   // crashed
+        case .blocked: return 1   // asking you a question
+        case .waiting: return 2   // your turn / awaiting input
+        case .done:    return 3   // process finished
+        case .idle, .working: return nil
+        }
+    }
+
+    /// Every agent across every canvas that isn't actively working or idle — blocked on a
+    /// question, crashed, or awaiting your input/review — worst-first. Read-only; never
+    /// mints a controller. The badge and inbox poll this on a light timer, which sidesteps
+    /// nested-observable plumbing for a value that can lag a couple seconds without harm.
+    /// Terminal-state agents (done/crashed) the user has already SEEN (revealed) — held
+    /// out of the badge/inbox until they change state, so a finished agent left on the
+    /// canvas doesn't pin "N need you" forever. Plain (non-published): mutated during the
+    /// poll without triggering a view-update cycle; re-armed when the agent leaves the state.
+    private var acknowledgedAttention: Set<UUID> = []
+
+    func agentsNeedingAttention() -> [AgentAttention] {
+        var out: [AgentAttention] = []
+        for ws in workspaces {
+            for panel in ws.panels where !panel.isBrowser {
+                guard let c = terminals.existingController(for: panel.id) else {
+                    acknowledgedAttention.remove(panel.id); continue
+                }
+                let s = c.displayStatus
+                guard Self.attentionRank(s) != nil else {
+                    acknowledgedAttention.remove(panel.id); continue   // busy/idle → re-arm
+                }
+                let isTerminalState = (s == .done || s == .error)
+                if !isTerminalState {
+                    acknowledgedAttention.remove(panel.id)             // left terminal state → re-arm
+                } else if acknowledgedAttention.contains(panel.id) {
+                    continue                                           // already seen → stay calm
+                }
+                out.append(AgentAttention(panel: panel, workspaceID: ws.id,
+                                          workspaceName: ws.name, status: s))
+            }
+        }
+        return out.sorted {
+            (Self.attentionRank($0.status) ?? 9, $0.panel.name) <
+            (Self.attentionRank($1.status) ?? 9, $1.panel.name)
+        }
+    }
+
+    /// Toggle the Attention Inbox open.
+    func openAttentionInbox() { showAttentionInbox = true }
+
+    /// Reveal the next agent needing attention in priority order, cycling from the current
+    /// selection — the keyboard triage loop (⌃⌥→). Closes the inbox so the agent is visible.
+    func jumpToNextAttention() {
+        let queue = agentsNeedingAttention()
+        guard !queue.isEmpty else { return }
+        showAttentionInbox = false
+        let start = queue.firstIndex { $0.panel.id == selection }
+        let target = start.map { queue[($0 + 1) % queue.count] } ?? queue[0]
+        revealAgent(target.panel.id)
+    }
+
+    /// Bring an agent (possibly on another canvas) into view: switch canvas if needed,
+    /// center the camera on it, select + raise it. Used by the badge and the inbox.
+    func revealAgent(_ panelId: UUID) {
+        guard let ws = workspaces.first(where: { $0.panels.contains { $0.id == panelId } }) else { return }
+        if ws.id != currentWorkspaceID { switchTo(ws.id) }                 // switchTo clears focus
+        if focusedPanel != nil, focusedPanel != panelId { exitFocus() }    // same-canvas: leave focus so the agent is actually visible
+        guard let p = panel(panelId) else { return }
+        selection = panelId
+        bringToFront(panelId)
+        centerCamera(on: CGPoint(x: p.worldFrame.midX, y: p.worldFrame.midY), viewportSize: lastViewport)
+        // Acknowledge a terminal-state agent on reveal — you've now seen the finish/crash,
+        // so it drops out of the attention set until it changes state again.
+        if let c = terminals.existingController(for: panelId), c.displayStatus == .done || c.displayStatus == .error {
+            acknowledgedAttention.insert(panelId)
+        }
     }
 
     /// While any agent is in Focus Mode, hide every browser's web surface so its

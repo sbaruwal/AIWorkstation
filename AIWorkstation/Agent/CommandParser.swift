@@ -5,6 +5,7 @@ enum ParsedCommand: Equatable {
     case agent(kind: AgentKind, task: String)        // create an agent (task may be empty)
     case browser(url: URL)                           // create a browser node
     case control(name: String, action: ControlAction) // act on an existing node by name
+    case broadcast(message: String)                  // fan a follow-up to every live agent
 }
 
 /// An action on an existing node, addressed by its name.
@@ -80,6 +81,11 @@ enum CommandParser {
         guard !text.isEmpty else { return nil }
         let lower = text.lowercased()
 
+        // 0) Broadcast: "tell all …" / "@all …" / "all: …" → fan a follow-up to every live
+        // agent. Matched before node control and regardless of existing nodes, so it
+        // degrades to a friendly "no agents" rather than spawning a new one.
+        if let message = broadcastTarget(text) { return .broadcast(message: message) }
+
         // 1) Control an existing node (only matches when a real node name is referenced).
         if let control = controlIntent(text, nodes: nodes, allowNameFirstCatchAll: allowNameFirstCatchAll) { return control }
 
@@ -105,6 +111,28 @@ enum CommandParser {
 
     static func fallback(_ raw: String, lastAgent: AgentKind) -> ParsedCommand {
         .agent(kind: lastAgent, task: raw.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    // MARK: Broadcast
+
+    /// "tell all <msg>" / "ask all [to] <msg>" / "@all <msg>" / "all: <msg>" → the message
+    /// to fan to every live agent, else nil. "all" is the reserved broadcast keyword.
+    private static func broadcastTarget(_ text: String) -> String? {
+        let words = text.split(separator: " ").map(String.init)
+        guard let first = words.first else { return nil }
+        let firstL = first.lowercased()
+        func clean(_ arr: [String], dropLeadingTo: Bool) -> String? {
+            var r = arr
+            if dropLeadingTo, r.first?.lowercased() == "to" { r = Array(r.dropFirst()) }
+            let m = r.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+            return m.isEmpty ? nil : m
+        }
+        if (firstL == "tell" || firstL == "ask"), words.count >= 3, words[1].lowercased() == "all" {
+            return clean(Array(words.dropFirst(2)), dropLeadingTo: firstL == "ask")
+        }
+        if firstL == "@all", words.count >= 2 { return clean(Array(words.dropFirst()), dropLeadingTo: false) }
+        if firstL == "all:", words.count >= 2 { return clean(Array(words.dropFirst()), dropLeadingTo: false) }
+        return nil
     }
 
     // MARK: Control intents

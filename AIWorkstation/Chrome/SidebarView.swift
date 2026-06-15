@@ -23,8 +23,8 @@ struct SidebarView: View {
                         } else {
                             // Observe the live controller so the dot tracks Working/
                             // Waiting/Idle in real time, not the stale stored status.
-                            AgentStatusRow(controller: state.terminals.controller(for: panel)) { status in
-                                panelRow(panel, status: status)
+                            AgentStatusRow(controller: state.terminals.controller(for: panel)) { controller in
+                                panelRow(panel, status: controller.displayStatus, controller: controller)
                             }
                         }
                     }
@@ -78,7 +78,7 @@ struct SidebarView: View {
         }
     }
 
-    private func panelRow(_ panel: PanelModel, status: SessionStatus) -> some View {
+    private func panelRow(_ panel: PanelModel, status: SessionStatus, controller: TerminalController? = nil) -> some View {
         Button {
             // Center the camera on *this* panel (and raise it), rather than fitting
             // the whole workspace — clicking a row should take you to that agent.
@@ -97,6 +97,16 @@ struct SidebarView: View {
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
                 Spacer()
+                // Live "how long" for the states where it matters (agents only).
+                if let controller, status == .waiting || status == .blocked || status == .error {
+                    TimelineView(.periodic(from: .now, by: 15)) { ctx in
+                        if let d = TerminalController.durationLabel(since: controller.statusSince, now: ctx.date) {
+                            Text(d)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Theme.textTertiary)
+                        }
+                    }
+                }
             }
             .padding(.vertical, 5)
             .padding(.horizontal, 8)
@@ -131,6 +141,6 @@ struct SidebarView: View {
 /// row builder, so a sidebar row re-renders when that agent's activity changes.
 private struct AgentStatusRow<Content: View>: View {
     @ObservedObject var controller: TerminalController
-    @ViewBuilder let content: (SessionStatus) -> Content
-    var body: some View { content(controller.displayStatus) }
+    @ViewBuilder let content: (TerminalController) -> Content
+    var body: some View { content(controller) }
 }
