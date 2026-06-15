@@ -343,6 +343,8 @@ final class CanvasState: ObservableObject {
         let wasCurrent = (id == currentWorkspaceID)
         workspaces.remove(at: idx)
         if workspaces.isEmpty {
+            focusedPanel = nil          // the focused agent (if any) lived on the deleted canvas
+            selection = nil
             let ws = Workspace(name: "My Workspace")
             workspaces = [ws]
             currentWorkspaceID = ws.id
@@ -763,6 +765,12 @@ final class CanvasState: ObservableObject {
         panel.browserURL = url.absoluteString
         panel.zIndex = topZIndex()
         workspace.panels.append(panel)
+        // Opened while an agent is focused (e.g. "open … in browser" from the focus
+        // re-prompt bar)? `focusedPanel` is unchanged, so the suppression didSet won't
+        // fire for this new panel — suppress it explicitly so its web view mounts hidden
+        // and never flashes over the cockpit. Minting is correct: it's on this canvas,
+        // about to mount.
+        if focusedPanel != nil { browsers.controller(for: panel).isSuppressed = true }
         selection = panel.id
         relayout(viewportSize: viewportSize)
         return panel.id
@@ -829,7 +837,12 @@ final class CanvasState: ObservableObject {
 
     @Published var newAgentDraft: NewAgentDraft?
     @Published var showCommandPalette = false
-    @Published var focusedPanel: UUID?
+    @Published var focusedPanel: UUID? {
+        didSet {
+            guard focusedPanel != oldValue else { return }
+            updateBrowserSuppression()   // hide/show browser web surfaces (see below)
+        }
+    }
     /// True while the on-device model is parsing a command-bar line (drives a spinner).
     @Published var isParsingCommand = false
     /// Whether the *last* command-bar line was resolved by Apple's on-device model
@@ -847,6 +860,34 @@ final class CanvasState: ObservableObject {
 
     func exitFocus() {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { focusedPanel = nil }
+    }
+
+    /// While any agent is in Focus Mode, hide every browser's web surface so its
+    /// separate WebContent-process layer can't composite over the focus cockpit (a
+    /// SwiftUI overlay can't be z-ordered above a sibling WKWebView's remote layer).
+    /// Unconditional — no geometry — so browsers parked in the inset margins simply
+    /// drop their web view; the card shows a themed "paused" state instead. Driven off
+    /// `focusedPanel` exactly like PanelCardView releases its PTY when focused. Spans
+    /// all canvases but never mints a controller, so it can't spawn stray web views.
+    func updateBrowserSuppression() {
+        let active = focusedPanel != nil
+        // Flip without animation. `webView.isHidden` is a non-animatable AppKit mutation
+        // (the surface re-composites on the next frame), so the card's matching cosmetic
+        // swap — dropping the white backing and the "Paused" overlay — must happen in the
+        // same frame. This runs inside enterFocus/exitFocus's `withAnimation`, so without
+        // an explicit transaction those views would inherit the 0.4s focus spring and the
+        // "Paused" text would ghost over the re-shown live page on exit. The FocusModeView
+        // spring is driven by `focusedPanel` (assigned outside this transaction) and is
+        // unaffected.
+        var t = Transaction()
+        t.disablesAnimations = true
+        withTransaction(t) {
+            for ws in workspaces {
+                for panel in ws.panels where panel.isBrowser {
+                    browsers.existingController(for: panel.id)?.isSuppressed = active
+                }
+            }
+        }
     }
 
     func isGitRepo(_ url: URL) -> Bool { GitManager.shared.repoRoot(url.path) != nil }

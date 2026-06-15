@@ -9,6 +9,20 @@ final class BrowserController: NSObject, ObservableObject, WKNavigationDelegate 
     let id: UUID
     let webView: WKWebView
 
+    /// Hide this browser's web surface while a Focus Mode cockpit is up. A `WKWebView`
+    /// composites in its own WebContent-process layer/IOSurface that sits *above* the
+    /// SwiftUI hosting layer, so `.zIndex` can't push the focus overlay over it — it
+    /// punches through. Setting `isHidden` drops that layer (and its surface) from the
+    /// compositing pass, so there's nothing left to punch through. NOT an unmount: the
+    /// NSView stays in the hierarchy and the page keeps running, so toggling back off
+    /// re-presents the live page with no reload.
+    @Published var isSuppressed = false {
+        didSet {
+            guard isSuppressed != oldValue else { return }
+            webView.isHidden = isSuppressed
+        }
+    }
+
     @Published private(set) var pageTitle: String = ""
     @Published var addressText: String = ""
     @Published private(set) var canGoBack = false
@@ -91,6 +105,10 @@ final class BrowserRegistry {
         controllers[panel.id] = controller
         return controller
     }
+
+    /// Existing controller without creating one — lets Focus Mode suppress live
+    /// browsers without lazily minting WKWebViews for browser panels on other canvases.
+    func existingController(for id: UUID) -> BrowserController? { controllers[id] }
 
     func remove(_ id: UUID) {
         controllers[id]?.stop()

@@ -19,9 +19,16 @@ struct BrowserCardView: View {
         VStack(spacing: 0) {
             header
             navBar
-            WebHostView(controller: controller)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.white)        // pages expect an opaque backdrop
+            ZStack {
+                WebHostView(controller: controller)
+                    // Pages expect an opaque backdrop — but only while shown. In Focus
+                    // Mode the web view is hidden (so it can't punch through the overlay),
+                    // so drop the white (which would be a blank hole where the card peeks
+                    // past the cockpit) and let the card's themed glass show through.
+                    .background(controller.isSuppressed ? Color.clear : Color.white)
+                if controller.isSuppressed { pausedOverlay }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(width: panel.width, height: panel.height)
         .background(cardBackground)
@@ -136,6 +143,21 @@ struct BrowserCardView: View {
             VisualEffectView(material: .hudWindow, blending: .withinWindow)
             theme.cardTint
         }
+    }
+
+    /// Covers the (hidden) web area while this browser is paused for Focus Mode, so the
+    /// card reads as intentionally parked rather than blank. Purely decorative.
+    private var pausedOverlay: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "pause.circle")
+                .font(.system(size: 20, weight: .light))
+                .foregroundStyle(Theme.textTertiary)
+            Text("Paused in Focus Mode")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.textTertiary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .allowsHitTesting(false)
     }
 
     // MARK: Resize handle
