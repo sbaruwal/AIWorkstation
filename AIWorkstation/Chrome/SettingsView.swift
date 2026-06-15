@@ -58,7 +58,7 @@ struct SettingsView: View {
                 shortcut("New canvas · Switch to canvas N", "⌥⌘N · ⌘1–9")
                 shortcut("Fit all to window", "⌘0")
                 shortcut("Tidy into a grid", "⇧⌘T")
-                shortcut("Focus Mode · Exit", "double-click · Esc")
+                shortcut("Focus Mode · Exit", "focus button · Esc")
             }
         }
         .formStyle(.grouped)

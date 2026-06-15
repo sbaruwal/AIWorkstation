@@ -123,7 +123,7 @@ Swift Package Manager resolves [SwiftTerm](https://github.com/migueldeicaza/Swif
 2. In the command bar at the bottom, type `claude refactor the auth module` and hit return — an agent card spawns in your chosen repo and runs the task.
 3. Type `codex` to add a second agent. Same repo? It lands in its own git worktree automatically.
 4. Watch the status dots: **green pulse** = working, **amber** = waiting on you.
-5. Double-click a card to enter **Focus Mode** and review its diff.
+5. Click a card's **focus button** (or type `focus Harbor`) to enter **Focus Mode** and review its diff.
 
 > **Tip:** press the **?** in the command bar for the full grammar, and `⌘K` for the command palette.
 
@@ -135,6 +135,7 @@ Swift Package Manager resolves [SwiftTerm](https://github.com/migueldeicaza/Swif
 | `codex` | New Codex agent |
 | `open figma in browser` · `open github.com` | New browser node |
 | `tell Harbor run the tests` | Follow-up message into the **Harbor** agent |
+| `focus Harbor` | Open the **Harbor** agent in Focus Mode |
 | `close Harbor` | Close that node |
 | `Reef navigate to bsky.app` | Point the **Reef** browser at a site |
 | *(just a task)* | Goes to your last-used agent |
@@ -175,7 +176,7 @@ Type a command → it's parsed (instantly when it can be, on-device when it's fu
 | `⌥⌘N` · `⌘1`–`⌘9` | New canvas · switch to canvas N |
 | `⌘0` | Fit all to window |
 | `⇧⌘T` | Tidy into a grid |
-| double-click · `Esc` | Enter / exit Focus Mode |
+| focus button · `Esc` | Enter / exit Focus Mode (or `focus <name>` in the command bar) |
 
 ## Project layout
 

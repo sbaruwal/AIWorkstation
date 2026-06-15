@@ -47,10 +47,11 @@ struct CommandCheatsheetView: View {
                     section(
                         "Control a node",
                         rows: [
+                            ("focus \(sampleName.lowercased())", "Open that agent in Focus Mode"),
                             ("\(sampleName) close", "Close it  ·  also  close \(sampleName.lowercased())"),
                             ("\(sampleName) stop", "Interrupt agent / stop page load"),
                             ("\(sampleName) restart", "Restart agent / reload page"),
-                            ("\(sampleName)", "Just the name → focus & bring forward"),
+                            ("\(sampleName)", "Just the name → select & bring forward"),
                         ]
                     )
                     section(

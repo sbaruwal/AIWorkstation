@@ -15,6 +15,7 @@ enum ControlAction: Equatable {
     case stop               // interrupt the agent (Ctrl-C)
     case restart            // restart the agent's session
     case focus              // just select / bring it to front (bare name)
+    case enterFocus         // open Focus Mode on an agent ("focus <name>")
 }
 
 /// Lightweight view of a live node, so the parser can recognize node names and know
@@ -134,15 +135,19 @@ enum CommandParser {
             return .control(name: ref.name, action: .navigate(BrowserURL.resolve(url)))
         }
 
-        // Lifecycle: "close/stop/restart <name>" (routing interprets per node type:
-        // stop → interrupt agent / stop browser loading; restart → restart agent / reload browser).
-        if words.count >= 2, ["close", "kill", "stop", "restart", "reload"].contains(firstL) {
-            let rest = words.dropFirst().joined(separator: " ")
+        // Lifecycle: "close/stop/restart/focus <name>" (routing interprets per node type:
+        // stop → interrupt agent / stop browser loading; restart → restart agent / reload browser;
+        // focus → open Focus Mode on an agent). Allows an optional "on" ("focus on Bluesky").
+        if words.count >= 2, ["close", "kill", "stop", "restart", "reload", "focus"].contains(firstL) {
+            var restWords = Array(words.dropFirst())
+            if firstL == "focus", restWords.first?.lowercased() == "on" { restWords = Array(restWords.dropFirst()) }
+            let rest = restWords.joined(separator: " ")
             if let ref = node(rest) {
                 switch firstL {
                 case "close", "kill":     return .control(name: ref.name, action: .close)
                 case "stop":              return .control(name: ref.name, action: .stop)
                 case "restart", "reload": return .control(name: ref.name, action: .restart)
+                case "focus":             return .control(name: ref.name, action: .enterFocus)
                 default: break
                 }
             }
@@ -186,12 +191,13 @@ enum CommandParser {
         if allowNameFirstCatchAll, let ref = node(first) {
             let rest = Array(words.dropFirst())
             if rest.isEmpty { return .control(name: ref.name, action: .focus) }
-            // name-first lifecycle: "cove close / stop / restart / reload"
+            // name-first lifecycle: "cove close / stop / restart / reload / focus"
             if rest.count == 1 {
                 switch rest[0].lowercased() {
                 case "close", "kill", "quit": return .control(name: ref.name, action: .close)
                 case "stop":                  return .control(name: ref.name, action: .stop)
                 case "restart", "reload":     return .control(name: ref.name, action: .restart)
+                case "focus":                 return .control(name: ref.name, action: .enterFocus)
                 default: break
                 }
             }

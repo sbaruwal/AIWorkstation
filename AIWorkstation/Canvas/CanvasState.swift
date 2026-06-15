@@ -704,6 +704,8 @@ final class CanvasState: ObservableObject {
             else { terminals.controller(for: panel).restart() }
         case .focus:
             break   // selection + bringToFront already done above
+        case .enterFocus:
+            if !panel.isBrowser { enterFocus(panel.id) }   // browsers have no Focus Mode (just selected above)
         }
     }
 

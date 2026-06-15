@@ -129,10 +129,11 @@ struct PanelCardView: View {
             Rectangle().fill(Color.white.opacity(0.06)).frame(height: 1)
         }
         .contentShape(Rectangle())
-        // Double-tap is high-priority so it wins the gesture arena over the single
-        // tap deterministically; a lone tap lets it fail and falls through to focus.
+        // A single tap selects the card. Focus Mode is entered explicitly — via the
+        // header focus button, the context menu, or the command bar (`focus <name>`) —
+        // never a double-tap, which competed with the header buttons (you couldn't
+        // reliably hit Close) and needed two tries to register.
         .onTapGesture { focus() }
-        .highPriorityGesture(TapGesture(count: 2).onEnded { state.enterFocus(panel.id) })
         .gesture(moveGesture)
         .popover(isPresented: $showChanges, arrowEdge: .bottom) {
             ChangedFilesView(directory: panel.workingDirectory ?? panel.repoRoot ?? "")
