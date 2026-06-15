@@ -20,9 +20,19 @@ struct FocusModeView: View {
     @State private var repoState: GitManager.RepoState?
     @State private var hasConstitution = false
     @State private var hasMemory = false
+    // Ship It
+    @State private var commitMessage = ""
+    @State private var confirmingShip = false
+    @State private var confirmingReject = false
+    @State private var testCommand = ""
+    @State private var testing = false
+    @State private var testResult: TestRunner.Result?
+    @State private var showTestOutput = false
 
     private var workingDir: String { panel.workingDirectory ?? panel.repoRoot ?? "" }
     private var isGit: Bool { panel.repoRoot != nil }
+    /// Ship It only applies to an isolated-worktree agent (there's a branch to merge back).
+    private var canShip: Bool { panel.isWorktree && panel.repoRoot != nil && panel.branch != nil }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,7 +49,27 @@ struct FocusModeView: View {
         }
         .background(backdrop)
         .transition(.scale(scale: 0.96).combined(with: .opacity))
-        .onAppear { reloadChanges(); reloadRepoState() }
+        .onAppear { reloadChanges(); reloadRepoState(); testCommand = TestRunner.command(for: workingDir) }
+        .confirmationDialog("Ship this agent's work?", isPresented: $confirmingShip, titleVisibility: .visible) {
+            Button("Commit & Merge") { state.shipPanel(panel.id, message: effectiveCommitMessage); state.exitFocus() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Commit the changes, merge \(branchShort) into \(repoState?.branch ?? "the base branch"), then close this agent.")
+        }
+        .confirmationDialog("Discard this agent's work?", isPresented: $confirmingReject, titleVisibility: .visible) {
+            Button("Discard & Close", role: .destructive) { state.exitFocus(); state.removePanel(panel.id) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Closes the agent and removes its worktree. Uncommitted changes are confirmed separately.")
+        }
+    }
+
+    private var branchShort: String {
+        (panel.branch ?? "").replacingOccurrences(of: "agent/", with: "")
+    }
+    private var effectiveCommitMessage: String {
+        let t = commitMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        return t.isEmpty ? (panel.task.isEmpty ? "Agent changes" : panel.task) : t
     }
 
     // MARK: Top bar
@@ -126,8 +156,117 @@ struct FocusModeView: View {
             changedFilesList.frame(height: 150)
             Divider().overlay(Color.white.opacity(0.08))
             diffView
+            if canShip {
+                Divider().overlay(Color.white.opacity(0.08))
+                shipSection
+            }
         }
         .background(Color.black.opacity(0.25))
+    }
+
+    // MARK: Ship It (review → merge)
+
+    private var shipSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("SHIP IT").font(.system(size: 9.5, weight: .bold)).tracking(0.6).foregroundStyle(Theme.textTertiary)
+                Spacer()
+                testControl
+            }
+            TextField(panel.task.isEmpty ? "Commit message" : panel.task, text: $commitMessage)
+                .textFieldStyle(.plain).font(.system(size: 11)).foregroundStyle(Theme.textPrimary)
+                .padding(.horizontal, 8).padding(.vertical, 5)
+                .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            HStack(spacing: 6) {
+                shipButton("Commit", "tray.and.arrow.down", tint: Theme.textSecondary) {
+                    state.commitWorktree(panel.id, message: effectiveCommitMessage)
+                }
+                shipButton("Accept", "checkmark", tint: SessionStatus.done.tint, filled: true) { confirmingShip = true }
+                shipButton("Reject", "xmark", tint: SessionStatus.error.tint) { confirmingReject = true }
+            }
+        }
+        .padding(.horizontal, 12).padding(.vertical, 10)
+    }
+
+    private func shipButton(_ label: String, _ icon: String, tint: Color, filled: Bool = false, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(label, systemImage: icon)
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(filled ? .white : tint)
+                .padding(.horizontal, 9).padding(.vertical, 5)
+                .background(filled ? AnyShapeStyle(tint.opacity(0.9)) : AnyShapeStyle(tint.opacity(0.14)),
+                            in: Capsule())
+                .overlay(Capsule().strokeBorder(tint.opacity(filled ? 0 : 0.4), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// User-pressed test run — exit-code only, never auto-judged. Tap the verdict to
+    /// peek at the tail output. If no command is detected, the field lets you set one.
+    @ViewBuilder private var testControl: some View {
+        HStack(spacing: 6) {
+            if let r = testResult {
+                Button { showTestOutput.toggle() } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: r.passed ? "checkmark.circle.fill" : "xmark.octagon.fill")
+                        Text(r.passed ? "passed" : "exit \(r.exitCode)")
+                    }
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(r.passed ? SessionStatus.done.tint : SessionStatus.error.tint)
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showTestOutput, arrowEdge: .bottom) { testOutputPopover(r) }
+            }
+            Button(action: runTests) {
+                HStack(spacing: 3) {
+                    if testing { ProgressView().controlSize(.mini) }
+                    else { Image(systemName: "play.circle").font(.system(size: 11, weight: .semibold)) }
+                    Text("Tests").font(.system(size: 10, weight: .medium))
+                }
+                .foregroundStyle(Theme.textSecondary)
+            }
+            .buttonStyle(.plain)
+            .disabled(testing)
+        }
+    }
+
+    private func testOutputPopover(_ r: TestRunner.Result) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(r.passed ? "Tests passed" : "Tests failed · exit \(r.exitCode)")
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(r.passed ? SessionStatus.done.tint : SessionStatus.error.tint)
+                Spacer()
+                Text(testCommand).font(.system(size: 10, design: .monospaced)).foregroundStyle(Theme.textTertiary)
+            }
+            ScrollView {
+                Text(r.output.isEmpty ? "(no output)" : r.output)
+                    .font(.system(size: 10.5, design: .monospaced))
+                    .foregroundStyle(Theme.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+            }
+            .frame(width: 460, height: 280)
+        }
+        .padding(12)
+    }
+
+    private func runTests() {
+        let dir = workingDir
+        let cmd = TestRunner.command(for: dir)
+        guard !cmd.isEmpty else {
+            // Nothing detected/configured → let the user set a command via the message field.
+            state.notifier.post("No test command", body: "Set one in Settings or this repo has no recognized test setup.", kind: .info, system: false)
+            return
+        }
+        testCommand = cmd
+        testing = true
+        testResult = nil
+        Task { @MainActor in
+            let r = await Task.detached { TestRunner.run(cmd, in: dir) }.value
+            testResult = r
+            testing = false
+        }
     }
 
     // MARK: Repo-state summary (branch · ahead/behind · dirty)

@@ -113,6 +113,51 @@ final class GitManager {
         }
     }
 
+    // MARK: Ship It (review → merge)
+
+    /// True when the working dir has no uncommitted changes (tracked or untracked).
+    func isClean(_ path: String) -> Bool {
+        let r = run(["-C", path, "status", "--porcelain"])
+        return r.status == 0 && r.out.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Stage everything and commit in the worktree. Returns false (NOT an error) when
+    /// there was nothing to commit. Throws on a real git failure.
+    @discardableResult
+    func commitAll(at worktree: String, message: String) throws -> Bool {
+        _ = run(["-C", worktree, "add", "-A"])
+        if isClean(worktree) { return false }   // nothing to commit
+        let msg = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        let r = run(["-C", worktree, "commit", "-m", msg.isEmpty ? "Agent changes" : msg])
+        if r.status != 0 {
+            throw GitError.command((r.err.isEmpty ? r.out : r.err).trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return true
+    }
+
+    /// Merge `branch` into the branch currently checked out in `repoRoot`. The main repo
+    /// must be clean first (we never merge over uncommitted work); a conflicting merge is
+    /// ABORTED and surfaced rather than left half-applied — the user resolves manually.
+    func mergeBranch(_ branch: String, into repoRoot: String) throws {
+        guard isClean(repoRoot) else {
+            throw GitError.command("The main repo has uncommitted changes — commit or stash them first, then ship.")
+        }
+        let r = run(["-C", repoRoot, "merge", "--no-edit", branch])
+        if r.status != 0 {
+            _ = run(["-C", repoRoot, "merge", "--abort"])   // restore the repo to its pre-merge state
+            let detail = (r.out + "\n" + r.err).trimmingCharacters(in: .whitespacesAndNewlines)
+            throw GitError.command("Merging \(branch) hit conflicts and was aborted — resolve it manually.\n\(detail)")
+        }
+    }
+
+    /// The branch currently checked out in a repo (for showing the merge target).
+    func currentBranch(at repoRoot: String) -> String? {
+        let r = run(["-C", repoRoot, "rev-parse", "--abbrev-ref", "HEAD"])
+        guard r.status == 0 else { return nil }
+        let b = r.out.trimmingCharacters(in: .whitespacesAndNewlines)
+        return b.isEmpty || b == "HEAD" ? nil : b
+    }
+
     /// Count of commits on `branch` not reachable from the main checkout's HEAD —
     /// i.e. *committed* work that would be lost if the worktree+branch are discarded.
     /// Complements `changedFiles` (which only sees uncommitted edits).

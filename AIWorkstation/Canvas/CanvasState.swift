@@ -989,6 +989,47 @@ final class CanvasState: ObservableObject {
         }
     }
 
+    // MARK: Ship It (review → merge)
+
+    /// Commit the worktree's changes (no merge), so you can checkpoint without shipping.
+    func commitWorktree(_ id: UUID, message: String) {
+        guard let panel = panel(id), let worktree = panel.worktreePath else { return }
+        let name = panelName(for: id)
+        Task { @MainActor in
+            do {
+                let made = try await Task.detached { try GitManager.shared.commitAll(at: worktree, message: message) }.value
+                notifier.post(made ? "Committed \(name)" : "Nothing to commit",
+                              body: made ? message : nil, kind: made ? .success : .info, system: false)
+            } catch {
+                notifier.post("Commit failed", body: error.localizedDescription, kind: .error)
+            }
+        }
+    }
+
+    /// Accept a worktree agent's work: commit it, merge the branch into the main repo's
+    /// current branch, then remove the worktree + close the card. All git mutations run
+    /// off-main; a conflict aborts the merge and surfaces an error — nothing is removed,
+    /// so the user can resolve manually. Only ever invoked from an explicit, confirmed tap.
+    func shipPanel(_ id: UUID, message: String) {
+        guard let panel = panel(id), let repoRoot = panel.repoRoot,
+              let branch = panel.branch, let worktree = panel.worktreePath else { return }
+        let name = panelName(for: id)
+        Task { @MainActor in
+            do {
+                try await Task.detached {
+                    _ = try GitManager.shared.commitAll(at: worktree, message: message)
+                    try GitManager.shared.mergeBranch(branch, into: repoRoot)
+                }.value
+                let short = branch.replacingOccurrences(of: "agent/", with: "")
+                notifier.post("Shipped \(name)", body: "Merged \(short) into \(GitManager.shared.currentBranch(at: repoRoot) ?? "the base") and cleaned up.", kind: .success)
+                // Worktree is committed + merged → clean → removePanel takes its no-confirm path.
+                removePanel(id)
+            } catch {
+                notifier.post("Couldn't ship \(name)", body: error.localizedDescription, kind: .error)
+            }
+        }
+    }
+
     /// While any agent is in Focus Mode, hide every browser's web surface so its
     /// separate WebContent-process layer can't composite over the focus cockpit (a
     /// SwiftUI overlay can't be z-ordered above a sibling WKWebView's remote layer).
