@@ -214,6 +214,9 @@ struct NewAgentDraft: Equatable {
     var task: String = ""
     var injectContext: Bool = true
     var autoRun: Bool = true
+    /// Advanced: user-owned free-text CLI flags + extra env (KEY=VALUE) for this launch.
+    var extraArgs: String = ""
+    var extraEnv: String = ""
 }
 
 /// A saved canvas environment: panels plus camera state.

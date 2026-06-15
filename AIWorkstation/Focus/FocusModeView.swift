@@ -28,6 +28,9 @@ struct FocusModeView: View {
     @State private var testing = false
     @State private var testResult: TestRunner.Result?
     @State private var showTestOutput = false
+    @State private var usage: UsageLedger.Usage?
+    @State private var canOpenPR = false
+    @State private var mergeTargetBranch = ""   // the repo root's current branch (the real merge destination)
 
     private var workingDir: String { panel.workingDirectory ?? panel.repoRoot ?? "" }
     private var isGit: Bool { panel.repoRoot != nil }
@@ -49,12 +52,12 @@ struct FocusModeView: View {
         }
         .background(backdrop)
         .transition(.scale(scale: 0.96).combined(with: .opacity))
-        .onAppear { reloadChanges(); reloadRepoState(); testCommand = TestRunner.command(for: workingDir) }
+        .onAppear { reloadChanges(); reloadRepoState(); reloadUsage(); reloadPRAvailability(); reloadMergeTarget(); testCommand = TestRunner.command(for: workingDir) }
         .confirmationDialog("Ship this agent's work?", isPresented: $confirmingShip, titleVisibility: .visible) {
             Button("Commit & Merge") { state.shipPanel(panel.id, message: effectiveCommitMessage); state.exitFocus() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Commit the changes, merge \(branchShort) into \(repoState?.branch ?? "the base branch"), then close this agent.")
+            Text("Commit the changes, merge \(branchShort) into \(mergeTargetBranch.isEmpty ? "the base branch" : mergeTargetBranch), then close this agent.")
         }
         .confirmationDialog("Discard this agent's work?", isPresented: $confirmingReject, titleVisibility: .visible) {
             Button("Discard & Close", role: .destructive) { state.exitFocus(); state.removePanel(panel.id) }
@@ -80,6 +83,8 @@ struct FocusModeView: View {
             Image(systemName: panel.kind.glyph).font(.system(size: 12, weight: .semibold)).foregroundStyle(panel.kind.tint)
             Text(panel.headerTitle).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.textPrimary).lineLimit(1)
 
+            if let u = usage { usageLabel(u) }
+
             Spacer()
 
             // Agent switcher — jump focus to another agent. Browser nodes are excluded
@@ -103,6 +108,27 @@ struct FocusModeView: View {
             control("arrow.down.right.and.arrow.up.left", "Exit Focus (Esc)") { state.exitFocus() }
         }
         .padding(.horizontal, 16).frame(height: 46)
+    }
+
+    /// Compact local token-usage readout (Claude agents) — tokens always, plus a $ value
+    /// only when the user has set a $/Mtok rate (clearly an estimate, never a fetched price).
+    private func usageLabel(_ u: UsageLedger.Usage) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "gauge.with.dots.needle.33percent").font(.system(size: 9, weight: .semibold))
+            Text("\(UsageLedger.formatTokens(u.totalTokens)) tok")
+            if let cost = UsageLedger.estimatedCost(u) {
+                Text(String(format: "· ~$%.2f", cost))
+            }
+        }
+        .font(.system(size: 10, weight: .medium))
+        .foregroundStyle(Theme.textTertiary)
+        .help("Approximate local token usage for this agent's working directory" +
+              (UsageLedger.estimatedCost(u) != nil ? " · cost is your configured $/Mtok estimate" : " · set a $/Mtok rate in Settings for a cost estimate"))
+    }
+
+    private func reloadUsage() {
+        let kind = panel.kind, dir = workingDir
+        Task { @MainActor in usage = await Task.detached { UsageLedger.usage(for: kind, cwd: dir) }.value }
     }
 
     private func control(_ icon: String, _ help: String, action: @escaping () -> Void) -> some View {
@@ -183,9 +209,32 @@ struct FocusModeView: View {
                 }
                 shipButton("Accept", "checkmark", tint: SessionStatus.done.tint, filled: true) { confirmingShip = true }
                 shipButton("Reject", "xmark", tint: SessionStatus.error.tint) { confirmingReject = true }
+                if canOpenPR {
+                    shipButton("PR", "arrow.triangle.pull", tint: state.accent) {
+                        state.openPullRequest(panel.id, message: effectiveCommitMessage)
+                    }
+                }
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
+    }
+
+    /// `gh` is optional — only show the PR button when it's installed AND the repo has a
+    /// remote. Checked off-main (both shell out) so the cockpit never blocks.
+    private func reloadPRAvailability() {
+        guard let repoRoot = panel.repoRoot else { return }
+        Task { @MainActor in
+            canOpenPR = await Task.detached { GHCli.isAvailable() && GitManager.shared.hasRemote(repoRoot) }.value
+        }
+    }
+
+    /// The real merge destination is the REPO ROOT's current branch (not the worktree's
+    /// own branch, which `repoState` reads). Resolved off-main for the ship confirmation.
+    private func reloadMergeTarget() {
+        guard let root = panel.repoRoot else { return }
+        Task { @MainActor in
+            mergeTargetBranch = await Task.detached { GitManager.shared.currentBranch(at: root) ?? "" }.value
+        }
     }
 
     private func shipButton(_ label: String, _ icon: String, tint: Color, filled: Bool = false, _ action: @escaping () -> Void) -> some View {

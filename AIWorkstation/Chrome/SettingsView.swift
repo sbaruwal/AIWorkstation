@@ -8,6 +8,8 @@ struct SettingsView: View {
     @State private var claudePath = AgentCLI.shared.resolvedPath(for: .claude)
     @State private var codexPath = AgentCLI.shared.resolvedPath(for: .codex)
     @State private var defaultRepo = WorkspaceStore.shared.defaultRepoFolder
+    @State private var inputRate = UsageLedger.inputRate
+    @State private var outputRate = UsageLedger.outputRate
 
     var body: some View {
         Form {
@@ -52,8 +54,23 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section("Usage estimate") {
+                Text("Per-agent token counts come from the agents' own local transcripts. Set your $/million-token rates for a cost ESTIMATE — these are your numbers, never a fetched price. Leave at 0 to show tokens only.")
+                    .font(.caption).foregroundStyle(.secondary)
+                LabeledContent("Input $/Mtok") {
+                    TextField("0", value: $inputRate, format: .number)
+                        .frame(width: 84).multilineTextAlignment(.trailing)
+                        .onChange(of: inputRate) { _, v in let c = max(0, v); if v != c { inputRate = c }; UsageLedger.inputRate = c }
+                }
+                LabeledContent("Output $/Mtok") {
+                    TextField("0", value: $outputRate, format: .number)
+                        .frame(width: 84).multilineTextAlignment(.trailing)
+                        .onChange(of: outputRate) { _, v in let c = max(0, v); if v != c { outputRate = c }; UsageLedger.outputRate = c }
+                }
+            }
             Section("Shortcuts") {
                 shortcut("Command palette", "⌘K")
+                shortcut("Attention Inbox · Next waiting agent", "⌘I · ⌃⌥→")
                 shortcut("New Claude / Codex agent", "⌘N · ⇧⌘N")
                 shortcut("New canvas · Switch to canvas N", "⌥⌘N · ⌘1–9")
                 shortcut("Fit all to window", "⌘0")

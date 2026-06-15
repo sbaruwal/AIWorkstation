@@ -118,6 +118,13 @@ final class TerminalController: NSObject, ObservableObject, LocalProcessTerminal
     var initialPrompt: String?
     var autoRunInitialPrompt = true
 
+    /// User-owned free-text CLI flags inserted into the launch (e.g. "--model opus").
+    /// Passed through verbatim — the app curates no flags/models (that stays a hard-stop).
+    var extraArgs = ""
+    /// User-owned extra environment, one `KEY=VALUE` per line/space, merged into the
+    /// agent's login environment.
+    var extraEnv = ""
+
     /// Fired when the process ends. `userInitiated` is true when WE killed it (close
     /// / restart), so the notifier can stay quiet for those and only surface
     /// unsolicited finishes/crashes.
@@ -233,6 +240,9 @@ final class TerminalController: NSObject, ObservableObject, LocalProcessTerminal
                 return
             }
             var invocation = "exec \(shellQuoted(path))"
+            // User-owned flags, verbatim (e.g. "--model opus --verbose"), before the prompt.
+            let flags = extraArgs.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !flags.isEmpty { invocation += " \(flags)" }
             if resumeOnNextLaunch, let resume = Self.resumeArguments(for: kind) {
                 // Resume the prior on-disk session (continue the conversation). Takes
                 // priority over any staged prompt — we're picking up where it left off,
@@ -431,6 +441,12 @@ final class TerminalController: NSObject, ObservableObject, LocalProcessTerminal
         env["TERM"] = "xterm-256color"
         env["COLORTERM"] = "truecolor"
         if env["LANG"] == nil { env["LANG"] = "en_US.UTF-8" }
+        // User-owned extra env, one KEY=VALUE per line (values may contain spaces).
+        for line in extraEnv.split(separator: "\n") {
+            let entry = line.trimmingCharacters(in: .whitespaces)
+            guard let eq = entry.firstIndex(of: "="), eq != entry.startIndex else { continue }
+            env[String(entry[..<eq])] = String(entry[entry.index(after: eq)...])
+        }
         return env.map { "\($0.key)=\($0.value)" }
     }
 

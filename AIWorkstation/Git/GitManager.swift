@@ -139,15 +139,48 @@ final class GitManager {
     /// must be clean first (we never merge over uncommitted work); a conflicting merge is
     /// ABORTED and surfaced rather than left half-applied — the user resolves manually.
     func mergeBranch(_ branch: String, into repoRoot: String) throws {
+        // Never merge into a detached HEAD — the merge commit would land on no branch
+        // (orphaned on the next checkout) while the user's base branch stays un-advanced.
+        guard currentBranch(at: repoRoot) != nil else {
+            throw GitError.command("The main repo is in a detached HEAD state — check out a branch before shipping.")
+        }
+        // Never run merge/merge-abort over an in-progress operation — it would corrupt it.
+        if let op = inProgressOperation(repoRoot) {
+            throw GitError.command("The main repo has a \(op) in progress — finish or abort it before shipping.")
+        }
         guard isClean(repoRoot) else {
             throw GitError.command("The main repo has uncommitted changes — commit or stash them first, then ship.")
         }
         let r = run(["-C", repoRoot, "merge", "--no-edit", branch])
         if r.status != 0 {
-            _ = run(["-C", repoRoot, "merge", "--abort"])   // restore the repo to its pre-merge state
             let detail = (r.out + "\n" + r.err).trimmingCharacters(in: .whitespacesAndNewlines)
-            throw GitError.command("Merging \(branch) hit conflicts and was aborted — resolve it manually.\n\(detail)")
+            // Only a started (conflicting) merge leaves MERGE_HEAD to abort; other failures
+            // (e.g. bad ref) never began a merge, so don't mislabel them as conflicts.
+            if run(["-C", repoRoot, "rev-parse", "-q", "--verify", "MERGE_HEAD"]).status == 0 {
+                _ = run(["-C", repoRoot, "merge", "--abort"])   // restore pre-merge state
+                throw GitError.command("Merging \(branch) hit conflicts and was aborted — resolve it manually.\n\(detail)")
+            }
+            throw GitError.command("Merging \(branch) failed:\n\(detail)")
         }
+    }
+
+    /// A git operation in progress in `repoRoot` (merge/rebase/bisect/cherry-pick), else nil.
+    private func inProgressOperation(_ repoRoot: String) -> String? {
+        let gd = run(["-C", repoRoot, "rev-parse", "--git-dir"]).out.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !gd.isEmpty else { return nil }
+        let base = gd.hasPrefix("/") ? gd : (repoRoot as NSString).appendingPathComponent(gd)
+        func has(_ p: String) -> Bool { FileManager.default.fileExists(atPath: (base as NSString).appendingPathComponent(p)) }
+        if has("MERGE_HEAD") { return "merge" }
+        if has("rebase-merge") || has("rebase-apply") { return "rebase" }
+        if has("BISECT_LOG") { return "bisect" }
+        if has("CHERRY_PICK_HEAD") { return "cherry-pick" }
+        return nil
+    }
+
+    /// True if `repoRoot` has at least one configured remote (needed to open a PR).
+    func hasRemote(_ repoRoot: String) -> Bool {
+        let r = run(["-C", repoRoot, "remote"])
+        return r.status == 0 && !r.out.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// The branch currently checked out in a repo (for showing the merge target).

@@ -51,6 +51,7 @@ struct NewAgentSheet: View {
             if draft.repo != nil { modeSection }
             taskSection
             togglesRow
+            advancedSection
             reviewBox
             footer
         }
@@ -196,6 +197,32 @@ struct NewAgentSheet: View {
             toggle("Read constitution.md & memory.md first", $draft.injectContext)
             toggle("Run on launch", $draft.autoRun)
             Spacer()
+        }
+    }
+
+    /// Power-user passthrough: free-text CLI flags + extra env for this launch. The app
+    /// curates nothing here — no model menu (that stays a hard-stop); these are yours.
+    private var advancedSection: some View {
+        DisclosureGroup("Advanced") {
+            VStack(alignment: .leading, spacing: 8) {
+                advancedField("Extra CLI flags", "e.g. --model opus  --verbose", $draft.extraArgs)
+                advancedField("Extra env (one KEY=VALUE per line)", "ANTHROPIC_LOG=debug", $draft.extraEnv, multiline: true)
+            }
+            .padding(.top, 6)
+        }
+        .font(.system(size: 12, weight: .medium))
+        .tint(Theme.textSecondary)
+    }
+
+    private func advancedField(_ label: String, _ placeholder: String, _ text: Binding<String>, multiline: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label).font(.system(size: 10.5, weight: .medium)).foregroundStyle(Theme.textTertiary)
+            TextField(placeholder, text: text, axis: multiline ? .vertical : .horizontal)
+                .lineLimit(multiline ? 4 : 1)
+                .textFieldStyle(.plain).font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(Theme.textPrimary)
+                .padding(.horizontal, 9).padding(.vertical, 6)
+                .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
     }
 

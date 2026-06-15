@@ -820,7 +820,8 @@ final class CanvasState: ObservableObject {
     }
 
     func deliverLaunch(kind: AgentKind, repoURL: URL, mode: RepoLaunchMode, task: String,
-                       injectContext: Bool, autoRun: Bool, viewportSize: CGSize) -> UUID {
+                       injectContext: Bool, autoRun: Bool, viewportSize: CGSize,
+                       extraArgs: String = "", extraEnv: String = "") -> UUID {
         // Validate the target before creating anything — launching into a missing or
         // inaccessible folder would spawn a PTY in the wrong place with no feedback.
         guard repoIsAccessible(repoURL) else {
@@ -832,13 +833,18 @@ final class CanvasState: ObservableObject {
             return UUID()
         }
         let id = addAgentPanel(kind: kind, repoURL: repoURL, mode: mode, viewportSize: viewportSize)
-        let trimmed = task.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, let panel = panel(id) else { return id }
+        guard let panel = panel(id) else { return id }
+        // Set user-owned flags/env up front (before any early return), so they apply even
+        // to a no-task launch. Used when the PTY starts (worktree mode defers the start).
+        let controller = terminals.controller(for: panel)
+        controller.extraArgs = extraArgs
+        controller.extraEnv = extraEnv
 
+        let trimmed = task.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return id }
         if let idx = workspace.panels.firstIndex(where: { $0.id == id }) {
             workspace.panels[idx].task = trimmed
         }
-        let controller = terminals.controller(for: panel)
         // The agent runs in the worktree (worktree mode) or the repo root; in both
         // cases the context files — if committed — live at the repo root, so probe
         // there (falling back to the working dir for a non-git folder).
@@ -1016,16 +1022,50 @@ final class CanvasState: ObservableObject {
         let name = panelName(for: id)
         Task { @MainActor in
             do {
-                try await Task.detached {
-                    _ = try GitManager.shared.commitAll(at: worktree, message: message)
+                // Returns (shipped, base): shipped == false when there was nothing to commit
+                // AND no unmerged commits — so we don't claim a merge that didn't happen.
+                let outcome = try await Task.detached { () -> (shipped: Bool, base: String) in
+                    let committed = try GitManager.shared.commitAll(at: worktree, message: message)
+                    let pending = GitManager.shared.unmergedCommitCount(repoRoot: repoRoot, branch: branch)
+                    let base = GitManager.shared.currentBranch(at: repoRoot) ?? "the base branch"
+                    guard committed || pending > 0 else { return (false, base) }
                     try GitManager.shared.mergeBranch(branch, into: repoRoot)
+                    return (true, base)
                 }.value
-                let short = branch.replacingOccurrences(of: "agent/", with: "")
-                notifier.post("Shipped \(name)", body: "Merged \(short) into \(GitManager.shared.currentBranch(at: repoRoot) ?? "the base") and cleaned up.", kind: .success)
-                // Worktree is committed + merged → clean → removePanel takes its no-confirm path.
-                removePanel(id)
+                if outcome.shipped {
+                    let short = branch.replacingOccurrences(of: "agent/", with: "")
+                    notifier.post("Shipped \(name)", body: "Merged \(short) into \(outcome.base) and cleaned up.", kind: .success)
+                    // Worktree is committed + merged → clean → removePanel takes its no-confirm path.
+                    removePanel(id)
+                } else {
+                    notifier.post("Nothing to ship", body: "\(name) has no changes or commits to merge.", kind: .info, system: false)
+                }
             } catch {
                 notifier.post("Couldn't ship \(name)", body: error.localizedDescription, kind: .error)
+            }
+        }
+    }
+
+    /// Open a GitHub PR for a worktree agent: commit its changes, push the branch, then
+    /// `gh pr create --fill`, and open the PR in the browser. Off-main; uses the user's
+    /// already-authed optional `gh` CLI — adds no accounts/backend.
+    func openPullRequest(_ id: UUID, message: String) {
+        guard let panel = panel(id), let branch = panel.branch, let worktree = panel.worktreePath else { return }
+        let name = panelName(for: id)
+        let short = branch.replacingOccurrences(of: "agent/", with: "")
+        notifier.post("Opening PR for \(name)…", body: "Committing + pushing \(short).", kind: .info, system: false)
+        Task { @MainActor in
+            let result = await Task.detached { () -> Result<String, GitError> in
+                do { _ = try GitManager.shared.commitAll(at: worktree, message: message) }
+                catch { return .failure(.command(error.localizedDescription)) }
+                return GHCli.openPR(worktree: worktree, branch: branch)
+            }.value
+            switch result {
+            case .success(let url):
+                notifier.post("PR opened for \(name)", body: url, kind: .success)
+                if let u = URL(string: url) { NSWorkspace.shared.open(u) }
+            case .failure(let err):
+                notifier.post("Couldn't open PR for \(name)", body: err.errorDescription ?? "gh failed", kind: .error)
             }
         }
     }
@@ -1079,7 +1119,8 @@ final class CanvasState: ObservableObject {
     func launchDraft(_ draft: NewAgentDraft, viewportSize: CGSize) {
         guard let repo = draft.repo else { return }
         deliverLaunch(kind: draft.kind, repoURL: repo, mode: draft.mode, task: draft.task,
-                      injectContext: draft.injectContext, autoRun: draft.autoRun, viewportSize: viewportSize)
+                      injectContext: draft.injectContext, autoRun: draft.autoRun, viewportSize: viewportSize,
+                      extraArgs: draft.extraArgs, extraEnv: draft.extraEnv)
         newAgentDraft = nil
     }
 
