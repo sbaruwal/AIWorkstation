@@ -83,12 +83,11 @@ A native Swift/SwiftUI app for macOS that puts **real PTY-backed terminals** on 
 
 ## Screenshots
 
-> Drop your captures in `docs/` and link them here.
+<p align="center">
+  <img src="docs/screenshot-canvas.jpg" width="100%" alt="The AIWorkstation canvas — two coding agents and three browser nodes on the Futuristic theme">
+</p>
 
-<!--
-<p align="center"><img src="docs/canvas.png" width="80%" alt="The canvas with several agents"></p>
-<p align="center"><img src="docs/focus.png" width="80%" alt="Focus Mode with the diff viewer"></p>
--->
+<p align="center"><sub>Two coding agents (Claude Code + Codex, auto-isolated in a git worktree) and three live browser nodes on one canvas — Futuristic theme.</sub></p>
 
 ## Requirements
 
