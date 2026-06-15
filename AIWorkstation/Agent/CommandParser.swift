@@ -84,7 +84,7 @@ enum CommandParser {
         if let control = controlIntent(text, nodes: nodes, allowNameFirstCatchAll: allowNameFirstCatchAll) { return control }
 
         // 2) Open a browser.
-        if let url = browserTarget(text, lower) { return .browser(url: url) }
+        if let url = browserTarget(text, lower, nodes: nodes) { return .browser(url: url) }
 
         // 3) Create an agent: "claude …", "codex", "cc …" — optionally prefixed with a
         // launch verb people naturally type ("open codex", "new claude", "launch cc fix it").
@@ -209,7 +209,7 @@ enum CommandParser {
 
     // MARK: Browser create
 
-    private static func browserTarget(_ text: String, _ lower: String) -> URL? {
+    private static func browserTarget(_ text: String, _ lower: String, nodes: [NodeRef] = []) -> URL? {
         var target: String?
         if lower.hasPrefix("browser ") {
             target = String(text.dropFirst("browser ".count))
@@ -219,10 +219,21 @@ enum CommandParser {
             target = String(text.dropFirst("open ".count).dropLast(" in browser".count))
         } else if lower.hasPrefix("open ") {
             let rest = String(text.dropFirst("open ".count)).trimmingCharacters(in: .whitespacesAndNewlines)
-            if looksLikeURL(rest) { target = rest }
+            // "open github.com" (a URL) or "open facebook" (a single site word). A bare
+            // word is treated as a site deterministically so it never falls to the model
+            // and gets mis-guessed. Skip agent launches ("open codex" / "open cc" — the
+            // agent branch handles those) and existing node names ("open Atlas" should
+            // act on the Atlas node, not open atlas.com). Multi-word "open …" stays
+            // ambiguous → model.
+            let restL = rest.lowercased()
+            let isNode = nodes.contains { $0.name.lowercased() == restL }
+            if looksLikeURL(rest) || (!rest.isEmpty && !rest.contains(" ") && AgentCatalog.match(rest) == nil && !isNode) {
+                target = rest
+            }
         }
         guard let t = target?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty else { return nil }
-        return BrowserURL.resolve(t)
+        // Command-bar opens land on the repo when unresolvable (not a stray web search).
+        return BrowserURL.resolve(t, unresolved: BrowserURL.repo)
     }
 
     private static func looksLikeURL(_ s: String) -> Bool {
@@ -242,17 +253,33 @@ enum BrowserURL {
         "bluesky": "bsky.app",
     ]
 
-    static func resolve(_ raw: String) -> URL {
+    /// The project repository — the friendly landing spot when a command-bar browser
+    /// open can't be resolved to a real site, instead of web-searching a stray phrase.
+    static let repo = URL(string: "https://github.com/sbaruwal/AIWorkstation")!
+
+    /// Resolve typed text to a URL. `unresolved` is where to land when the text isn't a
+    /// site we can derive: the in-card address bar (and "navigate") web-search by default;
+    /// a command-bar "open …" passes `repo` so an unrecognized open lands somewhere
+    /// friendly rather than guessing a random site.
+    static func resolve(_ raw: String, unresolved: URL? = nil) -> URL {
         let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         let lower = s.lowercased()
         if let host = shortcuts[lower] { return URL(string: "https://\(host)")! }
         if lower.hasPrefix("http://") || lower.hasPrefix("https://") {
-            return URL(string: s) ?? search(s)
+            return URL(string: s) ?? unresolved ?? search(s)
         }
         if s.contains("."), !s.contains(" ") {
-            return URL(string: "https://\(s)") ?? search(s)
+            return URL(string: "https://\(s)") ?? unresolved ?? search(s)
         }
-        return search(s)
+        // A single bare word → guess its .com ("facebook" → facebook.com). ASCII host
+        // labels only, so the interpolated string is always a valid URL.
+        if isHostLabel(s), let url = URL(string: "https://\(s).com") { return url }
+        return unresolved ?? search(s)
+    }
+
+    /// A single DNS label: ASCII letters/digits/hyphens, no dots or spaces.
+    private static func isHostLabel(_ s: String) -> Bool {
+        !s.isEmpty && s.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }
     }
 
     private static func search(_ query: String) -> URL {

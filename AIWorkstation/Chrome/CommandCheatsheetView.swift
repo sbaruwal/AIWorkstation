@@ -61,7 +61,8 @@ struct CommandCheatsheetView: View {
                             ("hn", "Hacker News"),
                             ("gh / github", "GitHub"),
                             ("yt / youtube", "YouTube"),
-                            ("anything else", "Falls back to a Google search"),
+                            ("open facebook", "A bare word → facebook.com"),
+                            ("open <phrase>", "Unrecognized → opens the project repo"),
                         ]
                     )
                 }

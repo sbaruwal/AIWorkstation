@@ -73,7 +73,7 @@ private struct FMIntent {
         case "create_browser":
             let t = target.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !t.isEmpty else { return nil }
-            return .browser(url: BrowserURL.resolve(t))
+            return .browser(url: BrowserURL.resolve(t, unresolved: BrowserURL.repo))
 
         case "control":
             // Match the model's target to a real node name (case-insensitive / prefix).
