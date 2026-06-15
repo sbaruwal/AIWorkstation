@@ -20,5 +20,7 @@ AI_Workstation_Deep_Spec_Package/
 # Media / scratch (keep large binaries out of git)
 *.mp4
 *.mov
+# …but DO ship the small, compressed demo clip the landing page embeds.
+!docs/demo.mp4
 
 # App-managed local data (created at runtime under ~/Library/Application Support)

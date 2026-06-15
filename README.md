@@ -91,6 +91,12 @@ A native Swift/SwiftUI app for macOS that puts **real PTY-backed terminals** on 
 
 <p align="center"><sub>Two coding agents (Claude Code + Codex, auto-isolated in a git worktree) and three live browser nodes on one canvas — Futuristic theme.</sub></p>
 
+<p align="center">
+  <img src="docs/screenshot-focus.jpg" width="100%" alt="AIWorkstation Focus Mode — one agent enlarged into a review cockpit">
+</p>
+
+<p align="center"><sub>Focus Mode — one agent enlarged into a review cockpit. ▶ <a href="https://sbaruwal.github.io/AIWorkstation/">Watch the demo</a>.</sub></p>
+
 ## Requirements
 
 - **To build: Xcode 26 or later.** The app imports Apple's `FoundationModels`, which only exists in the macOS 26 SDK — older Xcode fails with `no such module 'FoundationModels'`.

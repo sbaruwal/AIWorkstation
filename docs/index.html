@@ -92,7 +92,7 @@
     .pills span{display:inline-block; margin:0 9px}
 
     .shot{margin:46px auto 8px; max-width:1000px}
-    .shot img{width:100%; border:1px solid var(--line); border-radius:16px; box-shadow:0 30px 80px rgba(0,0,0,.5)}
+    .shot img,.shot video{width:100%; display:block; border:1px solid var(--line); border-radius:16px; box-shadow:0 30px 80px rgba(0,0,0,.5)}
     .cap{text-align:center; color:var(--muted); font-size:13px; margin-top:12px}
 
     section{padding:54px 0}
@@ -158,9 +158,11 @@
       </section>
 
       <div class="shot">
-        <img src="screenshot-canvas.jpg" loading="lazy"
-             alt="The AIWorkstation canvas with two coding-agent terminals (Claude Code and Codex) and three browser nodes on the Futuristic theme">
-        <p class="cap">Two coding agents (Claude Code + Codex, auto-isolated in a git worktree) and three live browser nodes on one canvas.</p>
+        <video src="demo.mp4" poster="demo-poster.jpg" autoplay muted loop playsinline controls
+               aria-label="AIWorkstation demo — coding agents and browser nodes on one canvas, then Focus Mode">
+          <img src="screenshot-canvas.jpg" alt="The AIWorkstation canvas with coding-agent terminals and browser nodes">
+        </video>
+        <p class="cap">A quick tour — coding agents and live browser nodes on one canvas, then Focus Mode on a single agent.</p>
       </div>
 
       <section id="features">
