@@ -1,9 +1,11 @@
 <p align="center">
-  <img src="docs/hero.png" alt="AIWorkstation" width="100%">
+  <img src="docs/hero.png" alt="AIWorkstation — a native macOS canvas for running multiple Claude Code and Codex AI coding agents as real terminal cards" width="100%">
 </p>
 
+<h1 align="center">AIWorkstation</h1>
+
 <p align="center">
-  <b>A native macOS canvas for commanding a fleet of AI coding agents — local-first, no backend, no accounts.</b>
+  <b>A native macOS app for running and orchestrating a fleet of AI coding agents — <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a> &amp; <a href="https://github.com/openai/codex">Codex</a> — as real PTY terminal cards on an infinite canvas. Local-first, no backend, no accounts.</b>
 </p>
 
 <p align="center">

@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>AIWorkstation — Command a fleet of AI coding agents on macOS</title>
+  <meta name="description" content="A native macOS canvas for running and orchestrating multiple AI coding agents — Claude Code &amp; Codex — as real PTY terminal cards, with git worktree isolation, browser nodes, and Focus Mode. Local-first, no backend, no accounts.">
+  <meta name="keywords" content="AI coding agents, Claude Code, Codex, macOS, SwiftUI, terminal, infinite canvas, git worktree, agent orchestration, local-first, developer tools, Claude Code GUI">
+  <meta name="author" content="Sujit Baruwal">
+  <meta name="theme-color" content="#070b14">
+  <link rel="canonical" href="https://sbaruwal.github.io/AIWorkstation/">
+
+  <!-- Open Graph / social unfurls -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="AIWorkstation">
+  <meta property="og:title" content="AIWorkstation — Command a fleet of AI coding agents on macOS">
+  <meta property="og:description" content="Run and orchestrate multiple AI coding agents (Claude Code, Codex) as real terminal cards on an infinite macOS canvas. Local-first, no backend.">
+  <meta property="og:url" content="https://sbaruwal.github.io/AIWorkstation/">
+  <meta property="og:image" content="https://sbaruwal.github.io/AIWorkstation/hero.png">
+  <meta property="og:image:alt" content="The AIWorkstation canvas with coding-agent terminals and browser nodes">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="AIWorkstation — Command a fleet of AI coding agents on macOS">
+  <meta name="twitter:description" content="Run and orchestrate multiple AI coding agents (Claude Code, Codex) as real terminal cards on an infinite macOS canvas. Local-first, no backend.">
+  <meta name="twitter:image" content="https://sbaruwal.github.io/AIWorkstation/hero.png">
+
+  <!-- Structured data: helps Google show a rich result -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "AIWorkstation",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "macOS 15+",
+    "description": "A native macOS canvas for running and orchestrating multiple AI coding agents (Claude Code, Codex) as real PTY terminal cards, with git worktree isolation, browser nodes, and Focus Mode. Local-first, no backend.",
+    "url": "https://github.com/sbaruwal/AIWorkstation",
+    "downloadUrl": "https://github.com/sbaruwal/AIWorkstation",
+    "softwareHelp": "https://github.com/sbaruwal/AIWorkstation#readme",
+    "license": "https://opensource.org/licenses/MIT",
+    "isAccessibleForFree": true,
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "author": { "@type": "Person", "name": "Sujit Baruwal" }
+  }
+  </script>
+
+  <style>
+    :root{
+      --bg:#070b14; --bg2:#0b1120; --panel:rgba(255,255,255,.035);
+      --line:rgba(255,255,255,.09); --text:#e8edf5; --muted:#9aa7bd;
+      --teal:#4fd1e6; --amber:#ffb061; --green:#34d399; --violet:#a78bfa;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0; background:var(--bg); color:var(--text);
+      font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+      -webkit-font-smoothing:antialiased;
+      background-image:
+        radial-gradient(1100px 520px at 78% -8%, rgba(79,209,230,.16), transparent 60%),
+        radial-gradient(900px 480px at 12% 4%, rgba(255,176,97,.10), transparent 60%);
+      background-repeat:no-repeat;
+    }
+    a{color:var(--teal); text-decoration:none}
+    a:hover{text-decoration:underline}
+    .wrap{max-width:1080px; margin:0 auto; padding:0 24px}
+
+    header.nav{display:flex; align-items:center; justify-content:space-between; padding:22px 0}
+    .brand{display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.2px}
+    .brand .dot{width:11px;height:11px;border-radius:50%;
+      background:radial-gradient(circle at 30% 30%, var(--teal), #1a6f7e);
+      box-shadow:0 0 14px rgba(79,209,230,.7)}
+    .nav a{color:var(--muted); font-weight:600}
+    .nav .gh{color:var(--text); border:1px solid var(--line); padding:8px 14px; border-radius:9px}
+    .nav .gh:hover{border-color:var(--teal); text-decoration:none}
+
+    .hero{text-align:center; padding:46px 0 8px}
+    .eyebrow{display:inline-block; font-size:12.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+      color:var(--teal); border:1px solid rgba(79,209,230,.35); background:rgba(79,209,230,.07);
+      padding:6px 12px; border-radius:999px; margin-bottom:22px}
+    h1{font-size:clamp(34px,6vw,60px); line-height:1.05; margin:.1em 0 .35em; letter-spacing:-.02em; font-weight:800}
+    h1 .grad{background:linear-gradient(100deg,var(--teal),var(--violet) 60%,var(--amber));
+      -webkit-background-clip:text; background-clip:text; color:transparent}
+    .lede{max-width:720px; margin:0 auto; font-size:clamp(16px,2.2vw,20px); color:var(--muted)}
+    .cta{display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin:30px 0 6px}
+    .btn{display:inline-flex; align-items:center; gap:9px; padding:13px 22px; border-radius:11px; font-weight:700; font-size:15px}
+    .btn.primary{background:linear-gradient(100deg,var(--teal),#37b6cd); color:#04202a; box-shadow:0 8px 30px rgba(79,209,230,.28)}
+    .btn.primary:hover{text-decoration:none; transform:translateY(-1px)}
+    .btn.ghost{border:1px solid var(--line); color:var(--text)}
+    .btn.ghost:hover{border-color:var(--teal); text-decoration:none}
+    .pills{margin-top:24px; color:var(--muted); font-size:13.5px}
+    .pills span{display:inline-block; margin:0 9px}
+
+    .shot{margin:46px auto 8px; max-width:1000px}
+    .shot img{width:100%; border:1px solid var(--line); border-radius:16px; box-shadow:0 30px 80px rgba(0,0,0,.5)}
+    .cap{text-align:center; color:var(--muted); font-size:13px; margin-top:12px}
+
+    section{padding:54px 0}
+    h2{font-size:clamp(24px,3.4vw,32px); letter-spacing:-.01em; margin:0 0 8px; text-align:center}
+    .sub{text-align:center; color:var(--muted); max-width:680px; margin:0 auto 34px}
+
+    .grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px}
+    @media(max-width:860px){.grid{grid-template-columns:1fr}}
+    .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px}
+    .card h3{margin:6px 0 6px; font-size:16.5px}
+    .card p{margin:0; color:var(--muted); font-size:14.5px}
+    .ic{font-size:22px; line-height:1}
+
+    .steps{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; counter-reset:s}
+    @media(max-width:860px){.steps{grid-template-columns:1fr}}
+    .step{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px; position:relative}
+    .step::before{counter-increment:s; content:counter(s); position:absolute; top:-14px; left:18px;
+      width:30px;height:30px; display:grid; place-items:center; border-radius:50%;
+      background:linear-gradient(100deg,var(--teal),#37b6cd); color:#04202a; font-weight:800; font-size:14px}
+    .step h3{margin:10px 0 6px; font-size:16px}
+    .step p{margin:0; color:var(--muted); font-size:14.5px}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .step code{color:var(--amber)}
+
+    .install{max-width:760px; margin:0 auto}
+    pre{background:#05070d; border:1px solid var(--line); border-radius:12px; padding:18px 20px; overflow:auto; font-size:13.5px; color:#cfe7ee}
+    pre .c{color:#5f6b80}
+
+    footer{border-top:1px solid var(--line); padding:34px 0 56px; color:var(--muted); font-size:13.5px; text-align:center}
+    footer a{color:var(--muted)} footer a:hover{color:var(--teal)}
+    footer .row{margin-bottom:10px}
+    footer .row a{margin:0 10px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="nav">
+      <div class="brand"><span class="dot"></span> AIWorkstation</div>
+      <nav>
+        <a href="#features">Features</a> &nbsp;
+        <a href="#how">How it works</a> &nbsp;
+        <a class="gh" href="https://github.com/sbaruwal/AIWorkstation">GitHub ↗</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <span class="eyebrow">Native macOS · Local-first · Open source</span>
+        <h1>Command a fleet of<br><span class="grad">AI coding agents</span></h1>
+        <p class="lede">AIWorkstation is a native macOS app that puts your <strong>Claude Code</strong> and
+          <strong>Codex</strong> agents on an infinite canvas — every agent a real PTY terminal card you can
+          see, arrange, and talk to. Real git isolation, all on your Mac. No backend, no accounts.</p>
+        <div class="cta">
+          <a class="btn primary" href="https://github.com/sbaruwal/AIWorkstation">★ Star on GitHub</a>
+          <a class="btn ghost" href="https://github.com/sbaruwal/AIWorkstation#build-from-source">Build from source</a>
+        </div>
+        <div class="pills">
+          <span>🖥️ Real PTY terminals</span>
+          <span>🌿 Git worktree isolation</span>
+          <span>🔒 100% local</span>
+          <span>⌨️ Command bar</span>
+        </div>
+      </section>
+
+      <div class="shot">
+        <img src="screenshot-canvas.jpg" loading="lazy"
+             alt="The AIWorkstation canvas with two coding-agent terminals (Claude Code and Codex) and three browser nodes on the Futuristic theme">
+        <p class="cap">Two coding agents (Claude Code + Codex, auto-isolated in a git worktree) and three live browser nodes on one canvas.</p>
+      </div>
+
+      <section id="features">
+        <h2>Your agents shouldn't live in a dozen terminal tabs</h2>
+        <p class="sub">Run more than one coding agent and the workflow falls apart — scattered tabs, repos
+          trampling each other, no idea which agent is working or waiting. AIWorkstation makes it one spatial surface.</p>
+        <div class="grid">
+          <div class="card"><div class="ic">🗺️</div><h3>Infinite canvas</h3><p>Pan, pinch-zoom, and a minimap. Every agent is a freely placed glass card; the window is just a viewport.</p></div>
+          <div class="card"><div class="ic">🖥️</div><h3>Real PTY terminals</h3><p>Each card is a genuine pseudo-terminal running your Claude Code / Codex CLI — full TUI, colors, Ctrl-C, resize.</p></div>
+          <div class="card"><div class="ic">🌿</div><h3>Git worktree isolation</h3><p>A second agent on the same repo automatically gets its own branch and worktree — no clobbering.</p></div>
+          <div class="card"><div class="ic">🟢</div><h3>Live agent status</h3><p>A status dot from real PTY activity — Working, Waiting, Idle, Done, Error — so finished work never sits unnoticed.</p></div>
+          <div class="card"><div class="ic">🔎</div><h3>Focus Mode</h3><p>One agent as a review cockpit: a large terminal beside a live diff viewer, repo state, and a command composer.</p></div>
+          <div class="card"><div class="ic">🌐</div><h3>Browser nodes</h3><p>Drop a web view onto the canvas next to your agents — docs, a dashboard, a PR — addressable by name.</p></div>
+          <div class="card"><div class="ic">🧭</div><h3>Multi-canvas workspaces</h3><p>Several named canvases in one window (⌘1–⌘9), each with its own agents, camera, and repo.</p></div>
+          <div class="card"><div class="ic">⌨️</div><h3>Command bar</h3><p>Type, don't click: <code>claude fix the bug</code>, <code>codex</code>, <code>open github</code>. With an on-device Apple Foundation Models fallback.</p></div>
+          <div class="card"><div class="ic">🔒</div><h3>Local-first</h3><p>One JSON file under Application Support. No server, no telemetry, no account.</p></div>
+        </div>
+      </section>
+
+      <section id="how">
+        <h2>Type a command. It does the rest.</h2>
+        <p class="sub">A command is parsed instantly (on-device when it's fuzzy), then routed — spawn an agent, open a browser, or control an existing node by name.</p>
+        <div class="steps">
+          <div class="step"><h3>Spawn an agent</h3><p>Type <code>claude refactor the auth module</code> — a card spawns in your repo and runs the task.</p></div>
+          <div class="step"><h3>Add a second</h3><p>Type <code>codex</code>. Same repo? It lands in its own git worktree automatically — no collisions.</p></div>
+          <div class="step"><h3>Watch &amp; review</h3><p>Status dots show who's working vs waiting. Hit Focus Mode to review an agent's diff and follow up.</p></div>
+        </div>
+      </section>
+
+      <section class="install">
+        <h2>Build from source</h2>
+        <p class="sub">Plain SwiftUI + AppKit, no exotic dependencies. Requires Xcode 26+ to build and macOS 15+ (Apple Silicon) to run.</p>
+        <pre><span class="c"># clone &amp; open in Xcode (⌘R), or build from the CLI</span>
+git clone https://github.com/sbaruwal/AIWorkstation.git
+cd AIWorkstation
+xcodebuild -project AIWorkstation.xcodeproj -scheme AIWorkstation -configuration Debug build</pre>
+        <p class="sub" style="margin-top:22px">Bring your own <code>claude</code> / <code>codex</code> CLI — the app auto-detects them on your PATH.</p>
+        <div class="cta">
+          <a class="btn primary" href="https://github.com/sbaruwal/AIWorkstation">Get it on GitHub →</a>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    <div class="row">
+      <a href="https://github.com/sbaruwal/AIWorkstation">GitHub</a>
+      <a href="https://github.com/sbaruwal/AIWorkstation#readme">Docs</a>
+      <a href="https://github.com/sbaruwal/AIWorkstation/blob/main/LICENSE">MIT License</a>
+      <a href="https://github.com/sbaruwal/AIWorkstation/blob/main/CONTRIBUTING.md">Contributing</a>
+    </div>
+    <div>Built to drive <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a> and
+      <a href="https://github.com/openai/codex">Codex</a>. Not affiliated with or endorsed by their owners.</div>
+    <div style="margin-top:8px">© 2026 Sujit Baruwal · A native macOS canvas for AI coding agents.</div>
+  </footer>
+</body>
+</html>
