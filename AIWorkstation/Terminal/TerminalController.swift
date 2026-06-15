@@ -132,6 +132,9 @@ final class TerminalController: NSObject, ObservableObject, LocalProcessTerminal
     private var userInitiatedExit = false
 
     private var didStart = false
+    /// When the next launch should RESUME the agent's prior CLI session (full history /
+    /// context) instead of starting fresh — set by `resumeSession()` on a recovered card.
+    private var resumeOnNextLaunch = false
     /// Pending "type the prompt after launch" work (review mode). Held so it can be
     /// cancelled if the session is restarted/terminated before the timer fires.
     private var pendingPrompt: DispatchWorkItem?
@@ -150,13 +153,38 @@ final class TerminalController: NSObject, ObservableObject, LocalProcessTerminal
         if recoverable { runState = .recoverable }
     }
 
-    /// Relaunch a recovered (or any) session on demand.
+    /// Relaunch a recovered (or any) session FRESH on demand.
     func relaunch() {
         guard runState != .preparing else { return }   // finishPreparing will start it (in the worktree)
         cancelPendingPrompt()
         didStart = false
         runState = .idle
         startIfNeeded()
+    }
+
+    /// Relaunch a recovered agent by RESUMING its prior CLI session — `claude --continue`
+    /// / `codex resume --last` re-attach the agent to its on-disk conversation (the CLIs
+    /// persist sessions per working directory), so the full history and context come back
+    /// and the agent re-renders where it left off. Falls back to whatever the CLI does
+    /// when no session exists; for a plain shell there's nothing to resume.
+    func resumeSession() {
+        guard kind != .shell else { return relaunch() }
+        resumeOnNextLaunch = true
+        relaunch()
+    }
+
+    /// Whether resuming the prior session is meaningful for this controller (an agent CLI).
+    var canResumeSession: Bool { kind == .claude || kind == .codex }
+
+    /// CLI arguments that resume the most recent session in the working directory.
+    /// Confirmed against the installed CLIs (`claude --continue`, `codex resume --last`).
+    /// Returned literal (not shell-quoted) — they're flags/subcommands, not a prompt.
+    private static func resumeArguments(for kind: AgentKind) -> String? {
+        switch kind {
+        case .claude: return "--continue"
+        case .codex:  return "resume --last"
+        case .shell:  return nil
+        }
     }
 
     // MARK: Async worktree preparation
@@ -205,10 +233,17 @@ final class TerminalController: NSObject, ObservableObject, LocalProcessTerminal
                 return
             }
             var invocation = "exec \(shellQuoted(path))"
-            // Auto-run: hand the task to the CLI as its initial prompt argument
-            // (`claude "<task>"` / `codex "<task>"`) — robust to first-run trust
-            // prompts. Review mode leaves it to be typed after launch instead.
-            if let prompt = initialPrompt, autoRunInitialPrompt {
+            if resumeOnNextLaunch, let resume = Self.resumeArguments(for: kind) {
+                // Resume the prior on-disk session (continue the conversation). Takes
+                // priority over any staged prompt — we're picking up where it left off,
+                // not starting a new task.
+                invocation += " \(resume)"
+                resumeOnNextLaunch = false
+                initialPrompt = nil
+            } else if let prompt = initialPrompt, autoRunInitialPrompt {
+                // Auto-run: hand the task to the CLI as its initial prompt argument
+                // (`claude "<task>"` / `codex "<task>"`) — robust to first-run trust
+                // prompts. Review mode leaves it to be typed after launch instead.
                 invocation += " \(shellQuoted(prompt))"
                 initialPrompt = nil
             }

@@ -392,16 +392,41 @@ struct PanelCardView: View {
                     .font(.system(size: 24, weight: .light)).foregroundStyle(Theme.textSecondary)
                 Text("Session ended")
                     .font(.system(size: 12.5, weight: .medium)).foregroundStyle(Theme.textPrimary)
-                Text("Restored from your last workspace")
+                Text(terminal.canResumeSession
+                     ? "Resume to continue the conversation, with full context."
+                     : "Restored from your last workspace")
                     .font(.system(size: 10.5)).foregroundStyle(Theme.textTertiary)
-                Button { terminal.relaunch() } label: {
-                    Label("Relaunch", systemImage: "play.fill")
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .padding(.horizontal, 14).padding(.vertical, 7)
-                        .background(state.accent.opacity(0.92), in: Capsule())
-                        .foregroundStyle(.white)
-                }.buttonStyle(.plain)
+                    .multilineTextAlignment(.center)
+                if terminal.canResumeSession {
+                    HStack(spacing: 8) {
+                        // Primary: resume the agent's prior CLI session (history + context).
+                        Button { terminal.resumeSession() } label: {
+                            Label("Resume", systemImage: "play.fill")
+                                .font(.system(size: 11.5, weight: .semibold))
+                                .padding(.horizontal, 14).padding(.vertical, 7)
+                                .background(state.accent.opacity(0.92), in: Capsule())
+                                .foregroundStyle(.white)
+                        }.buttonStyle(.plain)
+                        // Secondary: start a clean session (e.g. if there's nothing to resume).
+                        Button { terminal.relaunch() } label: {
+                            Text("Fresh")
+                                .font(.system(size: 11.5, weight: .semibold))
+                                .padding(.horizontal, 12).padding(.vertical, 7)
+                                .background(Color.white.opacity(0.10), in: Capsule())
+                                .foregroundStyle(Theme.textSecondary)
+                        }.buttonStyle(.plain)
+                    }
+                } else {
+                    Button { terminal.relaunch() } label: {
+                        Label("Relaunch", systemImage: "play.fill")
+                            .font(.system(size: 11.5, weight: .semibold))
+                            .padding(.horizontal, 14).padding(.vertical, 7)
+                            .background(state.accent.opacity(0.92), in: Capsule())
+                            .foregroundStyle(.white)
+                    }.buttonStyle(.plain)
+                }
             }
+            .padding(.horizontal, 12)
         }
     }
 
