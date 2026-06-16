@@ -26,6 +26,7 @@ struct TopToolbarView: View {
             divider
 
             attentionBadge
+            raceChip
 
             // Launch a real Claude / Codex agent: pick a repo, start the CLI there.
             toolButton("plus", help: "New Claude agent") {
@@ -114,6 +115,29 @@ struct TopToolbarView: View {
 
                     divider
                 }
+            }
+        }
+    }
+
+    /// While a race is running, a chip to re-open its compare deck (so closing the
+    /// overlay never strands the race).
+    @ViewBuilder private var raceChip: some View {
+        if let race = state.activeRace {
+            HStack(spacing: 6) {
+                Button { state.showRaceOverlay = true } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "flag.checkered").font(.system(size: 10, weight: .bold))
+                        Text("Race · \(race.racers.count)").font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(state.accent)
+                    .padding(.horizontal, 9).padding(.vertical, 4)
+                    .background(state.accent.opacity(0.14), in: Capsule())
+                    .overlay(Capsule().strokeBorder(state.accent.opacity(0.4), lineWidth: 1))
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .help("Open the race compare deck")
+                divider
             }
         }
     }

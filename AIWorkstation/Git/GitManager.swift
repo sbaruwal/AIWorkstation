@@ -82,15 +82,45 @@ final class GitManager {
     }
 
     /// `git worktree add -b <branch> <path>` — new branch off HEAD in a fresh dir.
-    func createWorktree(repoRoot: String, branch: String, at path: String) throws {
+    /// Create a worktree on a new branch. `base` pins the fork point (a SHA/ref) so a set
+    /// of racers can all branch from the SAME snapshotted commit; nil forks from HEAD.
+    func createWorktree(repoRoot: String, branch: String, at path: String, base: String? = nil) throws {
         let parent = (path as NSString).deletingLastPathComponent
         try? FileManager.default.createDirectory(atPath: parent, withIntermediateDirectories: true)
 
-        let r = run(["-C", repoRoot, "worktree", "add", "-b", branch, path])
+        var args = ["-C", repoRoot, "worktree", "add", "-b", branch, path]
+        if let base, !base.isEmpty { args.append(base) }
+        let r = run(args)
         if r.status != 0 {
             let msg = r.err.isEmpty ? "git worktree add failed (status \(r.status))" : r.err
             throw GitError.command(msg.trimmingCharacters(in: .whitespacesAndNewlines))
         }
+    }
+
+    /// The current commit of a repo — snapshotted at race start so every racer forks from
+    /// it and every racer diff lines up against the same base (not a moving HEAD).
+    func headSHA(at repoRoot: String) -> String? {
+        let r = run(["-C", repoRoot, "rev-parse", "HEAD"])
+        guard r.status == 0 else { return nil }
+        let sha = r.out.trimmingCharacters(in: .whitespacesAndNewlines)
+        return sha.isEmpty ? nil : sha
+    }
+
+    /// A racer's NET changes vs the snapshotted base — `git diff <base>` captures tracked
+    /// committed+uncommitted changes against the base tree; untracked new files are
+    /// appended via the binary-safe `--no-index` trick. Never touches the worktree's index.
+    func raceDiff(worktree: String, baseSHA: String) -> String {
+        var out = run(["-C", worktree, "diff", baseSHA]).out
+        // NUL-separated + quotePath off so untracked names with spaces / unicode / control
+        // chars are handled (like changedFiles), not silently dropped.
+        let listing = run(["-C", worktree, "-c", "core.quotePath=false",
+                           "ls-files", "--others", "--exclude-standard", "-z"]).out
+        for file in listing.split(separator: "\0").map(String.init) where !file.isEmpty {
+            // --no-index exits non-zero when files differ but still emits the diff.
+            let r = run(["-C", worktree, "diff", "--no-index", "--", "/dev/null", file])
+            if !r.out.isEmpty { out += (out.isEmpty ? "" : "\n") + r.out }
+        }
+        return out
     }
 
     func removeWorktree(repoRoot: String, at path: String, force: Bool) throws {
@@ -181,6 +211,11 @@ final class GitManager {
     func hasRemote(_ repoRoot: String) -> Bool {
         let r = run(["-C", repoRoot, "remote"])
         return r.status == 0 && !r.out.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Force-delete a branch (used to clean up race branches after keep/discard).
+    func deleteBranch(_ branch: String, at repoRoot: String) {
+        _ = run(["-C", repoRoot, "branch", "-D", branch])
     }
 
     /// The branch currently checked out in a repo (for showing the merge target).

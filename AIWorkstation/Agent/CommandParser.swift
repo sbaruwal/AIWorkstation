@@ -6,6 +6,7 @@ enum ParsedCommand: Equatable {
     case browser(url: URL)                           // create a browser node
     case control(name: String, action: ControlAction) // act on an existing node by name
     case broadcast(message: String)                  // fan a follow-up to every live agent
+    case race(prompt: String)                        // run one prompt across the default racers
 }
 
 /// An action on an existing node, addressed by its name.
@@ -86,6 +87,9 @@ enum CommandParser {
         // degrades to a friendly "no agents" rather than spawning a new one.
         if let message = broadcastTarget(text) { return .broadcast(message: message) }
 
+        // 0b) Race: "race <prompt>" → run the prompt across the default racers (Claude+Codex).
+        if let racePrompt = raceTarget(text) { return .race(prompt: racePrompt) }
+
         // 1) Control an existing node (only matches when a real node name is referenced).
         if let control = controlIntent(text, nodes: nodes, allowNameFirstCatchAll: allowNameFirstCatchAll) { return control }
 
@@ -133,6 +137,14 @@ enum CommandParser {
         if firstL == "@all", words.count >= 2 { return clean(Array(words.dropFirst()), dropLeadingTo: false) }
         if firstL == "all:", words.count >= 2 { return clean(Array(words.dropFirst()), dropLeadingTo: false) }
         return nil
+    }
+
+    /// "race <prompt>" → the prompt to run across the default racers, else nil.
+    private static func raceTarget(_ text: String) -> String? {
+        let words = text.split(separator: " ").map(String.init)
+        guard words.first?.lowercased() == "race", words.count >= 2 else { return nil }
+        let p = words.dropFirst().joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        return p.isEmpty ? nil : p
     }
 
     // MARK: Control intents

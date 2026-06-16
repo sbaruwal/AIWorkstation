@@ -219,6 +219,34 @@ struct NewAgentDraft: Equatable {
     var extraEnv: String = ""
 }
 
+/// One contestant in a race: an agent kind + optional flags (e.g. a different model).
+struct RacerConfig: Identifiable, Equatable {
+    var id = UUID()
+    var kind: AgentKind = .claude
+    var flags: String = ""
+    /// Display label, e.g. "Claude", "Codex", "Claude · opus".
+    var label: String = ""
+}
+
+/// A live race: one prompt run across N agents, each in its own worktree forked from the
+/// same snapshotted base commit, so their diffs line up and the winner can be merged.
+struct AgentRace: Identifiable, Equatable {
+    let id: UUID
+    let prompt: String
+    let repoRoot: String
+    let baseBranch: String   // the branch the winner merges back into (repoRoot's branch at start)
+    let baseSHA: String      // the commit every racer forks from / diffs against
+    var racers: [Racer]
+
+    struct Racer: Identifiable, Equatable {
+        let id: UUID         // == the agent panel's id
+        let kind: AgentKind
+        let label: String
+        let branch: String
+        let worktree: String
+    }
+}
+
 /// A saved canvas environment: panels plus camera state.
 struct Workspace: Identifiable, Codable, Equatable {
     var id: UUID = UUID()

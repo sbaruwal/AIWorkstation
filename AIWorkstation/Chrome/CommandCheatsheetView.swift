@@ -23,6 +23,7 @@ struct CommandCheatsheetView: View {
                             ("claude <task>", "New Claude agent on the chosen repo"),
                             ("codex <task>", "New Codex agent"),
                             ("cc <task>", "Shorthand for Claude"),
+                            ("race <task>", "Run it across Claude + Codex → diff & keep the winner"),
                             ("<just a task>", "Uses the last agent you started"),
                         ]
                     )

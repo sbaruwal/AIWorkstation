@@ -491,24 +491,33 @@ final class CanvasState: ObservableObject {
                     return error.localizedDescription
                 }
             }.value
-            self?.finalizeWorktreeLaunch(panelId: panelId, repoRoot: repoRoot, path: path, errorMessage: errorMessage)
+            self?.finalizeWorktreeLaunch(panelId: panelId, repoRoot: repoRoot, branch: branch, path: path, errorMessage: errorMessage)
         }
     }
 
-    private func finalizeWorktreeLaunch(panelId: UUID, repoRoot: String, path: String, errorMessage: String?) {
+    private func finalizeWorktreeLaunch(panelId: UUID, repoRoot: String, branch: String, path: String, errorMessage: String?) {
         guard let idx = workspace.panels.firstIndex(where: { $0.id == panelId }) else {
             // The card was closed while the worktree was being created — don't leave
-            // the freshly-created worktree orphaned on disk. (Closing mid-prep takes
-            // removePanel's fast path, so this runs *after* the checkout — no race.)
+            // the freshly-created worktree (or its branch) orphaned. (Closing mid-prep
+            // takes the fast path, so this runs *after* the checkout — no race.)
             if errorMessage == nil {
-                Task.detached { try? GitManager.shared.removeWorktree(repoRoot: repoRoot, at: path, force: true) }
+                Task.detached {
+                    try? GitManager.shared.removeWorktree(repoRoot: repoRoot, at: path, force: true)
+                    GitManager.shared.deleteBranch(branch, at: repoRoot)
+                }
             }
             return
         }
         let controller = terminals.existingController(for: panelId)
         if let errorMessage {
-            // Checkout failed → no worktree exists; clear the provisional metadata so
-            // nothing points at a missing dir, and run in the repo root (user warned).
+            // A RACER must NEVER fall back to the repo root — that would run its agent in
+            // the user's main working tree, unisolated. Retire the racer instead.
+            if activeRace?.racers.contains(where: { $0.id == panelId }) == true {
+                failRacer(panelId, reason: errorMessage)
+                return
+            }
+            // Non-race agent: checkout failed → clear provisional metadata and run in the
+            // repo root (the user is warned).
             workspace.panels[idx].branch = nil
             workspace.panels[idx].worktreePath = nil
             workspace.panels[idx].workingDirectory = repoRoot
@@ -664,6 +673,8 @@ final class CanvasState: ObservableObject {
             applyControl(name: name, action: action)
         case .broadcast(let message):
             broadcastToAgents(message)
+        case .race(let prompt):
+            startQuickRace(prompt: prompt, repo: repo, viewportSize: viewportSize)
         }
     }
 
@@ -711,6 +722,8 @@ final class CanvasState: ObservableObject {
                 applyControl(name: name, action: action)
             case .broadcast(let message):
                 broadcastToAgents(message)
+            case .race(let prompt):
+                startQuickRace(prompt: prompt, repo: nil, viewportSize: viewportSize)
             }
         } else if let panel = panel(focusedId) {
             deliverToAgent(panel, message: text)   // plain prose → follow-up to this agent
@@ -1068,6 +1081,218 @@ final class CanvasState: ObservableObject {
                 notifier.post("Couldn't open PR for \(name)", body: err.errorDescription ?? "gh failed", kind: .error)
             }
         }
+    }
+
+    // MARK: Race (one prompt across N agents → compare → keep the winner)
+
+    @Published var activeRace: AgentRace?
+    @Published var showRaceOverlay = false
+    @Published var raceTestResults: [UUID: TestRunner.Result] = [:]
+    @Published var raceTesting: Set<UUID> = []
+
+    /// Start a race: snapshot the repo's HEAD, fork N worktrees from that exact commit, and
+    /// auto-run the prompt in each (per-racer flags applied). All racers branch from one base
+    /// so their diffs line up and the winner merges back cleanly.
+    func startRace(prompt: String, repoURL: URL, racers: [RacerConfig], viewportSize: CGSize) {
+        let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedPrompt.isEmpty, !racers.isEmpty else { return }
+        // One race at a time — re-show the running race rather than clobbering its panels.
+        guard activeRace == nil else {
+            showRaceOverlay = true
+            notifier.post("A race is already running", body: "Finish or discard it before starting another.", kind: .info, system: false)
+            return
+        }
+        guard repoIsAccessible(repoURL) else {
+            notifier.post("Can't race", body: "“\(repoURL.lastPathComponent)” isn't an accessible folder.", kind: .error, system: false)
+            return
+        }
+        guard let root = GitManager.shared.repoRoot(repoURL.path) else {
+            notifier.post("Race needs a git repo", body: "Worktree isolation requires git — pick a repo with history.", kind: .error, system: false)
+            return
+        }
+        guard let baseSHA = GitManager.shared.headSHA(at: root) else {
+            notifier.post("Race needs a commit", body: "The repo has no HEAD to fork from — make an initial commit first.", kind: .error, system: false)
+            return
+        }
+        let baseBranch = GitManager.shared.currentBranch(at: root) ?? "the base branch"
+        defaultRepo = repoURL
+        WorkspaceStore.shared.pushRecentRepo(repoURL)
+
+        var raceRacers: [AgentRace.Racer] = []
+        for config in racers {
+            let panelId = UUID()
+            let label = config.label.isEmpty ? config.kind.displayName : config.label
+            // Unique per racer (panelId) so two same-kind racers don't collide on a branch.
+            let branch = GitManager.sanitizeRef("agent/race-\(config.kind.rawValue)-\(panelId.uuidString.prefix(6))").lowercased()
+            let path = GitManager.shared.worktreePath(workspaceId: workspace.id, agentId: panelId)
+
+            var panel = PanelModel()
+            panel.id = panelId
+            panel.kind = config.kind
+            panel.name = nextNodeName()
+            panel.project = repoURL.lastPathComponent
+            panel.task = trimmedPrompt
+            panel.repoRoot = root
+            panel.branch = branch
+            panel.worktreePath = path
+            panel.workingDirectory = root            // provisional until the worktree lands
+            panel.size = initialPanelSize(viewportSize: viewportSize)
+            panel.position = autoPlace(size: panel.size, viewportSize: viewportSize)
+            panel.zIndex = topZIndex()
+            workspace.panels.append(panel)
+
+            let controller = terminals.controller(for: panel)
+            controller.extraArgs = config.flags
+            controller.initialPrompt = buildLaunchPrompt(task: trimmedPrompt, injectContext: injectContext, directory: root)
+            controller.autoRunInitialPrompt = true
+            controller.beginPreparing()
+            startRaceWorktreeCreation(panelId: panelId, repoRoot: root, branch: branch, path: path, base: baseSHA)
+
+            raceRacers.append(AgentRace.Racer(id: panelId, kind: config.kind, label: label, branch: branch, worktree: path))
+        }
+
+        raceTestResults = [:]
+        raceTesting = []
+        activeRace = AgentRace(id: UUID(), prompt: trimmedPrompt, repoRoot: root,
+                               baseBranch: baseBranch, baseSHA: baseSHA, racers: raceRacers)
+        showRaceOverlay = true
+        relayout(viewportSize: viewportSize)
+    }
+
+    /// The default cross-vendor racer lineup for "race <prompt>".
+    func defaultRacers() -> [RacerConfig] {
+        [RacerConfig(kind: .claude, label: "Claude"), RacerConfig(kind: .codex, label: "Codex")]
+    }
+
+    /// Quick race from the command bar: default racers on the given/default repo.
+    func startQuickRace(prompt: String, repo: URL?, viewportSize: CGSize) {
+        guard let target = repo ?? defaultRepo ?? RepoPicker.pickDirectory() else { return }
+        startRace(prompt: prompt, repoURL: target, racers: defaultRacers(), viewportSize: viewportSize)
+    }
+
+    private func startRaceWorktreeCreation(panelId: UUID, repoRoot: String, branch: String, path: String, base: String) {
+        Task { [weak self] in
+            let errorMessage = await Task.detached { () -> String? in
+                do { try GitManager.shared.createWorktree(repoRoot: repoRoot, branch: branch, at: path, base: base); return nil }
+                catch { return error.localizedDescription }
+            }.value
+            self?.finalizeWorktreeLaunch(panelId: panelId, repoRoot: repoRoot, branch: branch, path: path, errorMessage: errorMessage)
+        }
+    }
+
+    /// A racer's worktree couldn't be created — retire it (never run its agent in the repo
+    /// root) and drop it from the race. If none survive, end the race.
+    private func failRacer(_ panelId: UUID, reason: String) {
+        let label = activeRace?.racers.first(where: { $0.id == panelId })?.label ?? "A racer"
+        notifier.post("Couldn't isolate \(label)", body: "Worktree failed — skipped. \(reason)", kind: .error, system: false)
+        terminals.remove(panelId)                       // never starts its PTY
+        workspace.panels.removeAll { $0.id == panelId }
+        if selection == panelId { selection = nil }
+        activeRace?.racers.removeAll { $0.id == panelId }
+        if activeRace?.racers.isEmpty == true { discardRace() }
+        else { relayout(viewportSize: lastViewport) }
+    }
+
+    /// A racer's net diff vs the snapshotted base (off-main; for the compare column).
+    func raceDiff(for racerId: UUID) async -> String {
+        guard let race = activeRace, let racer = race.racers.first(where: { $0.id == racerId }) else { return "" }
+        let wt = racer.worktree, base = race.baseSHA
+        return await Task.detached { GitManager.shared.raceDiff(worktree: wt, baseSHA: base) }.value
+    }
+
+    /// Run the repo's test command in every racer worktree (exit-code only), concurrently.
+    func runRaceTests() {
+        guard let race = activeRace else { return }
+        let cmd = TestRunner.command(for: race.repoRoot)
+        guard !cmd.isEmpty else {
+            notifier.post("No test command", body: "No recognized test setup for this repo — set one in Settings.", kind: .info, system: false)
+            return
+        }
+        for racer in race.racers {
+            // Skip racers whose worktree checkout hasn't finished — the dir doesn't exist yet.
+            guard terminals.existingController(for: racer.id)?.runState != .preparing else { continue }
+            raceTesting.insert(racer.id)
+            let wt = racer.worktree, id = racer.id
+            Task { @MainActor in
+                let r = await Task.detached { TestRunner.run(cmd, in: wt) }.value
+                raceTestResults[id] = r
+                raceTesting.remove(id)
+            }
+        }
+    }
+
+    /// Keep one racer: commit its work, merge its branch into the base branch, then discard
+    /// every racer (winner included — its work is now merged) + their worktrees/branches.
+    func keepRaceWinner(_ racerId: UUID) {
+        guard let race = activeRace, let winner = race.racers.first(where: { $0.id == racerId }) else { return }
+        let repoRoot = race.repoRoot, prompt = race.prompt, baseBranch = race.baseBranch
+        Task { @MainActor in
+            // Returns .success("") when the winner had nothing to merge; .success(branch)
+            // on a real merge; .failure on a wrong-target/conflict/error.
+            let result = await Task.detached { () -> Result<String, GitError> in
+                // The merge must land on the SAME branch the race forked from — refuse if
+                // the user switched the main repo's branch mid-race.
+                guard let cur = GitManager.shared.currentBranch(at: repoRoot) else {
+                    return .failure(.command("The main repo is in a detached HEAD — check out \(baseBranch) to keep this racer."))
+                }
+                guard cur == baseBranch else {
+                    return .failure(.command("The repo is now on \(cur), not the race base \(baseBranch) — switch back to keep this racer."))
+                }
+                do {
+                    let committed = try GitManager.shared.commitAll(at: winner.worktree, message: prompt)
+                    let pending = GitManager.shared.unmergedCommitCount(repoRoot: repoRoot, branch: winner.branch)
+                    guard committed || pending > 0 else { return .success("") }   // nothing to merge
+                    try GitManager.shared.mergeBranch(winner.branch, into: repoRoot)
+                    return .success(cur)
+                } catch let e as GitError { return .failure(e) }
+                catch { return .failure(.command(error.localizedDescription)) }
+            }.value
+            switch result {
+            case .success(let base) where base.isEmpty:
+                // Don't tear down the race — let the user pick a different racer.
+                notifier.post("Nothing to keep", body: "\(winner.label) made no changes yet.", kind: .info, system: false)
+            case .success(let base):
+                notifier.post("Kept \(winner.label)", body: "Merged into \(base) and discarded the others.", kind: .success)
+                endRace()
+            case .failure(let err):
+                notifier.post("Couldn't keep \(winner.label)", body: err.errorDescription ?? "merge failed", kind: .error)
+            }
+        }
+    }
+
+    /// Discard the whole race — close every racer, force-remove their worktrees + branches.
+    func discardRace() {
+        guard activeRace != nil else { return }
+        notifier.post("Race discarded", body: "Closed the racers and removed their worktrees.", kind: .info, system: false)
+        endRace()
+    }
+
+    /// Tear down all racer panels + their worktrees/branches (no dirty-confirm — the race
+    /// decision was explicit), and close the overlay.
+    private func endRace() {
+        guard let race = activeRace else { return }
+        for racer in race.racers {
+            // If the worktree checkout is still in flight, don't race it with a remove —
+            // drop the panel and let finalizeWorktreeLaunch's orphan path reap the
+            // worktree AND its branch once the checkout completes (mirrors removePanel).
+            let preparing = terminals.existingController(for: racer.id)?.runState == .preparing
+            terminals.remove(racer.id)                    // terminates the PTY
+            workspace.panels.removeAll { $0.id == racer.id }
+            if selection == racer.id { selection = nil }
+            if focusedPanel == racer.id { focusedPanel = nil }
+            if !preparing {
+                let root = race.repoRoot, wt = racer.worktree, branch = racer.branch
+                Task.detached {
+                    try? GitManager.shared.removeWorktree(repoRoot: root, at: wt, force: true)
+                    GitManager.shared.deleteBranch(branch, at: root)
+                }
+            }
+        }
+        activeRace = nil
+        showRaceOverlay = false
+        raceTestResults = [:]
+        raceTesting = []
+        relayout(viewportSize: lastViewport)
     }
 
     /// While any agent is in Focus Mode, hide every browser's web surface so its

@@ -250,6 +250,10 @@ struct CanvasView: View {
             AttentionInboxView(state: state)
                 .zIndex(250)   // above Focus Mode — triage from anywhere
         }
+        if state.showRaceOverlay {
+            RaceOverlayView(state: state)
+                .zIndex(260)   // the race compare deck, above everything but toasts
+        }
         if state.showOnboarding {
             OnboardingView(state: state)
                 .zIndex(300)
@@ -308,7 +312,8 @@ struct CanvasView: View {
     }
 
     private func dismissTopMostOrDeselect() {
-        if state.showAttentionInbox { state.showAttentionInbox = false }
+        if state.showRaceOverlay { state.showRaceOverlay = false }
+        else if state.showAttentionInbox { state.showAttentionInbox = false }
         else if state.showCommandPalette { state.showCommandPalette = false }
         else if state.newAgentDraft != nil { state.newAgentDraft = nil }
         else if state.focusedPanel != nil { state.exitFocus() }
