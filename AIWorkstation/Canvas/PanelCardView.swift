@@ -83,8 +83,27 @@ struct PanelCardView: View {
         .background(cardBackground)
         .themedCardFrame(state.canvasTheme, isSelected: isSelected, accent: state.accent)
         .overlay(alignment: .bottomTrailing) { resizeHandle }
+        .overlay(alignment: .topLeading) { quickSwitchBadge }
         .shadow(color: Theme.cardShadow, radius: isSelected ? 26 : 16, x: 0, y: 11)
         .onHover { hovering = $0 }
+    }
+
+    /// The floating "⌃N" summon-hotkey badge, shown when the canvas is zoomed out (so you
+    /// can pick an agent from the overview). Counter-scaled against the camera zoom so it
+    /// stays readable as the cards shrink.
+    @ViewBuilder private var quickSwitchBadge: some View {
+        if zoom < 0.92, let n = state.quickSwitchIndex(of: panel.id) {
+            Text("⌃⌥\(n)")
+                .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 6).padding(.vertical, 2.5)
+                .background(state.accent.opacity(0.92), in: Capsule())
+                .overlay(Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 0.5))
+                .scaleEffect(min(1 / max(zoom, 0.35), 2.4), anchor: .topLeading)
+                .padding(7)
+                .allowsHitTesting(false)
+                .transition(.scale.combined(with: .opacity))
+        }
     }
 
     private func focus() {

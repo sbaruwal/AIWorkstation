@@ -1364,6 +1364,39 @@ final class CanvasState: ObservableObject {
         withCameraAnimation { self.camera = Camera(pan: pan, zoom: zoom) }
     }
 
+    // MARK: Quick-switch (summon an agent to the front by hotkey)
+
+    /// Agent (non-browser) cards in canvas order — the quick-switch list; the first 9 get
+    /// a ⌃1…⌃9 hotkey and a badge.
+    var quickSwitchAgents: [PanelModel] { workspace.panels.filter { !$0.isBrowser } }
+
+    /// The ⌃-digit (1-based) that summons this panel, or nil if it isn't in the first 9.
+    func quickSwitchIndex(of id: UUID) -> Int? {
+        guard let i = quickSwitchAgents.firstIndex(where: { $0.id == id }), i < 9 else { return nil }
+        return i + 1
+    }
+
+    /// ⌃N → summon the Nth agent (0-based index).
+    func quickSwitch(to index: Int, viewportSize: CGSize) {
+        let agents = quickSwitchAgents
+        guard agents.indices.contains(index) else { return }
+        zoomToCard(agents[index].id, viewportSize: viewportSize)
+    }
+
+    /// Summon a card to the front: raise it, select it, and smoothly zoom the camera to
+    /// frame it (the quick-switch "pop to front"). ⌃0 / Fit returns to the overview.
+    func zoomToCard(_ id: UUID, viewportSize: CGSize) {
+        guard let p = panel(id), viewportSize.width > 0, viewportSize.height > 0 else { return }
+        bringToFront(id)
+        selection = id
+        let frame = p.worldFrame.insetBy(dx: -60, dy: -60)   // breathing room around the card
+        let z = min(Theme.maxZoom, max(Theme.minZoom,
+                    min(viewportSize.width / frame.width, viewportSize.height / frame.height)))
+        let pan = CGSize(width: viewportSize.width / 2 - frame.midX * z,
+                         height: viewportSize.height / 2 - frame.midY * z)
+        withCameraAnimation { self.camera = Camera(pan: pan, zoom: z) }
+    }
+
     func relayout(viewportSize: CGSize) {
         // Don't reflow while a card is being dragged — it would yank the grid out
         // from under the cursor. The drop handler re-grids it (reorderByPosition).

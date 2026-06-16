@@ -290,6 +290,15 @@ struct CanvasView: View {
                 }
                 .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .command)
             }
+            // ⌃⌥1…⌃⌥9 summon the Nth agent to the front (zoom-to-card); ⌃⌥0 back to overview.
+            // (⌃⌥ family, matching the ⌃⌥Space summon — and clear of macOS's optional
+            // Ctrl-digit "Switch to Desktop N" Mission Control shortcuts.)
+            ForEach(1...9, id: \.self) { n in
+                Button("") { state.quickSwitch(to: n - 1, viewportSize: viewport) }
+                    .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: [.control, .option])
+            }
+            Button("") { state.centerWorkspace(viewportSize: viewport) }
+                .keyboardShortcut("0", modifiers: [.control, .option])
             Button("") { dismissTopMostOrDeselect() }
                 .keyboardShortcut(.escape, modifiers: [])
         }

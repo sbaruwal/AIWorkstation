@@ -70,6 +70,8 @@ struct SettingsView: View {
             }
             Section("Shortcuts") {
                 shortcut("Command palette", "⌘K")
+                shortcut("Summon to front (from any app)", "⌃⌥Space")
+                shortcut("Jump to agent N · Back to overview", "⌃⌥1–9 · ⌃⌥0")
                 shortcut("Attention Inbox · Next waiting agent", "⌘I · ⌃⌥→")
                 shortcut("New Claude / Codex agent", "⌘N · ⇧⌘N")
                 shortcut("New canvas · Switch to canvas N", "⌥⌘N · ⌘1–9")

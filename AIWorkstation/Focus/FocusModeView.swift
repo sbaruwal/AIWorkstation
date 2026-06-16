@@ -16,6 +16,7 @@ struct FocusModeView: View {
     @State private var files: [ChangedFile] = []
     @State private var selectedFile: ChangedFile?
     @State private var diff: String = ""
+    @State private var diffLines: [DiffLineRow] = []   // pre-parsed + pre-styled, rendered lazily
     @State private var reprompt: String = ""
     @State private var repoState: GitManager.RepoState?
     @State private var hasConstitution = false
@@ -411,27 +412,57 @@ struct FocusModeView: View {
         }
     }
 
+    /// One pre-parsed, pre-styled diff line — colours are computed once when the diff
+    /// loads (not per render) so a large diff doesn't re-classify every line each frame.
+    struct DiffLineRow: Identifiable {
+        let id: Int
+        let text: String
+        let color: Color
+        let bg: Color
+    }
+
+    /// Cap rows kept in memory so a pathological diff (a minified bundle, a lockfile)
+    /// can't build a multi-hundred-thousand-element array. LazyVStack handles the rest.
+    private static let maxDiffLines = 4000
+
+    private func rebuildDiffLines() {
+        guard !diff.isEmpty else { diffLines = []; return }
+        let raw = diff.split(separator: "\n", omittingEmptySubsequences: false)
+        var rows: [DiffLineRow] = []
+        rows.reserveCapacity(min(raw.count, Self.maxDiffLines) + 1)
+        for (i, sub) in raw.prefix(Self.maxDiffLines).enumerated() {
+            let line = String(sub)
+            rows.append(DiffLineRow(id: i, text: line.isEmpty ? " " : line, color: diffColor(line), bg: diffBg(line)))
+        }
+        if raw.count > Self.maxDiffLines {
+            rows.append(DiffLineRow(id: Self.maxDiffLines,
+                                    text: "… \(raw.count - Self.maxDiffLines) more lines — open the file to see the rest",
+                                    color: Theme.textTertiary, bg: .clear))
+        }
+        diffLines = rows
+    }
+
     private var diffView: some View {
         ScrollView([.vertical, .horizontal]) {
-            if diff.isEmpty {
+            if diffLines.isEmpty {
                 Text(selectedFile == nil ? "Select a file to see its diff" : "No diff")
                     .font(.system(size: 11)).foregroundStyle(Theme.textTertiary).padding(12)
             } else {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(diff.split(separator: "\n", omittingEmptySubsequences: false).enumerated()), id: \.offset) { _, raw in
-                        let line = String(raw)
-                        Text(line.isEmpty ? " " : line)
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(diffLines) { row in
+                        Text(row.text)
                             .font(.system(size: 10.5, design: .monospaced))
-                            .foregroundStyle(diffColor(line))
+                            .foregroundStyle(row.color)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 12)
-                            .background(diffBg(line))
+                            .background(row.bg)
                     }
                 }
                 .padding(.vertical, 6)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onChange(of: diff) { _, _ in rebuildDiffLines() }
     }
 
     // MARK: Re-prompt bar
