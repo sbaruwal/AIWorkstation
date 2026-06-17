@@ -15,9 +15,11 @@ name: Release
 #   MACOS_NOTARY_ISSUER_ID    App Store Connect issuer id
 #   MACOS_NOTARY_KEY_P8_BASE64  base64 of the App Store Connect API .p8 key
 
+# Manual-only. The recommended release path is scripts/release.sh on your Mac (it has
+# Xcode 26 + your Developer ID cert). Run this from the Actions tab once the MACOS_* secrets
+# are configured. No automatic v* tag trigger — creating a release tag shouldn't fire a job
+# that fails when the signing secrets aren't set (which is the case while you release locally).
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
     inputs:
       version:
@@ -36,7 +38,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Resolve version
-        run: echo "VERSION=${GITHUB_REF_NAME#v}${{ github.event.inputs.version }}" | sed 's/=v*/=/' >> "$GITHUB_ENV"
+        run: echo "VERSION=${{ github.event.inputs.version }}" >> "$GITHUB_ENV"
 
       - name: Select Xcode 26
         run: |
@@ -99,6 +101,9 @@ jobs:
           create-dmg --volname "$APP_NAME" --window-size 660 380 \
             --icon "$APP_NAME.app" 165 185 --app-drop-link 495 185 "$DMG" "$APP" \
           || hdiutil create -volname "$APP_NAME" -srcfolder "$APP" -ov -format UDZO "$DMG"
+          # Sign the dmg container too (matches scripts/release.sh) so Gatekeeper has a usable
+          # signature on the dmg, not just the stapled notarization ticket.
+          codesign --force --timestamp --sign "Developer ID Application" "$DMG"
           echo "DMG=$DMG" >> "$GITHUB_ENV"
 
       - name: Notarize + staple

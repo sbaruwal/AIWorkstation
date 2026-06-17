@@ -91,6 +91,12 @@ else
   hdiutil create -volname "$APP_NAME" -srcfolder "$APP" -ov -format UDZO "$DMG"
 fi
 
+# Sign the DMG container too (not just the app), so Gatekeeper has a usable signature on
+# the dmg itself — otherwise `spctl -a -t open` reports "no usable signature" even though
+# the app inside is notarized. Apple's recommended belt-and-suspenders for distribution.
+echo "▸ Signing the DMG…"
+codesign --force --timestamp --sign "$IDENTITY" "$DMG"
+
 if [ "$NOTARIZE" = "0" ]; then
   echo
   echo "⚠️  Skipped notarization (NOTARIZE=0). This DMG is SIGNED but NOT notarized —"
