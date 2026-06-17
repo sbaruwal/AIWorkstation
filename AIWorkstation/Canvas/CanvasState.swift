@@ -1400,7 +1400,10 @@ final class CanvasState: ObservableObject {
                 self.terminals.remove(id)       // leave the worktree on disk
             case .discard:
                 self.terminals.remove(id)
-                await Task.detached { try? GitManager.shared.removeWorktree(repoRoot: root, at: wt, force: true) }.value
+                await Task.detached {
+                    try? GitManager.shared.removeWorktree(repoRoot: root, at: wt, force: true)
+                    if !branch.isEmpty { GitManager.shared.deleteBranch(branch, at: root) }   // mirror race cleanup — don't leak the merged/abandoned branch
+                }.value
             }
             self.workspace.panels.removeAll { $0.id == id }
             if self.selection == id { self.selection = nil }
