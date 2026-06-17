@@ -9,7 +9,7 @@
 # (`shasum -a 256 build/AIWorkstation-<version>.dmg`), then commit to the tap.
 cask "aiworkstation" do
   version "0.1.0"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  sha256 "0ba4c472d6ce16d16041756de968f2dc2691c06bc61cb744bbf7b3d0ec74f89a"
 
   url "https://github.com/sbaruwal/AIWorkstation/releases/download/v#{version}/AIWorkstation-#{version}.dmg"
   name "AIWorkstation"

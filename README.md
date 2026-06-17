@@ -15,11 +15,16 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/sbaruwal/AIWorkstation/releases/latest"><img src="https://img.shields.io/github/v/release/sbaruwal/AIWorkstation?label=download&color=000000&logo=apple&logoColor=white" alt="Download latest release"></a>
   <img src="https://img.shields.io/badge/platform-macOS-000000?logo=apple&logoColor=white" alt="macOS">
   <img src="https://img.shields.io/badge/Swift-SwiftUI%20%2B%20AppKit-FA7343?logo=swift&logoColor=white" alt="Swift">
   <img src="https://img.shields.io/badge/license-MIT-3b82f6" alt="MIT">
   <img src="https://img.shields.io/badge/data-100%25%20local-22c55e" alt="Local-first">
   <img src="https://img.shields.io/badge/backend-none-8b5cf6" alt="No backend">
+</p>
+
+<p align="center">
+  <a href="https://github.com/sbaruwal/AIWorkstation/releases/latest"><b>⬇︎&nbsp; Download for macOS</b></a> — signed &amp; notarized <code>.dmg</code> · Apple Silicon · macOS 15+
 </p>
 
 ---
@@ -32,6 +37,7 @@
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [Requirements](#requirements)
+- [Install](#install)
 - [Build from source](#build-from-source)
 - [Quick start](#quick-start)
 - [Command grammar](#command-grammar)
@@ -106,6 +112,22 @@ A native Swift/SwiftUI app for macOS that puts **real PTY-backed terminals** on 
   - [Codex](https://github.com/openai/codex) — `codex`
 
   The app auto-detects them through your login shell; you can also point it at a binary in **Settings**.
+
+## Install
+
+**The easy way — download the signed app** (no Xcode required):
+
+1. Download the latest **[`AIWorkstation.dmg`](https://github.com/sbaruwal/AIWorkstation/releases/latest)** from Releases.
+2. Open it and drag **AIWorkstation** into **Applications**. The app is signed with an Apple Developer ID and notarized by Apple, so it opens with **no Gatekeeper warnings** — no `xattr` dance, no right-click-Open.
+3. Make sure your `claude` / `codex` CLIs are installed and on your `PATH` (see [Requirements](#requirements)). The app auto-detects them on first launch.
+
+Prefer Homebrew? Once the cask tap is published:
+
+```bash
+brew install --cask sbaruwal/aiworkstation/aiworkstation
+```
+
+…or [build it from source](#build-from-source) below.
 
 ## Build from source
 
