@@ -196,9 +196,12 @@
       </section>
 
       <section class="install">
-        <h2>Build from source</h2>
-        <p class="sub">Plain SwiftUI + AppKit, no exotic dependencies. Requires Xcode 26+ to build and macOS 15+ (Apple Silicon) to run.</p>
-        <pre><span class="c"># clone &amp; open in Xcode (⌘R), or build from the CLI</span>
+        <h2>Install</h2>
+        <p class="sub">Signed &amp; notarized — opens with no Gatekeeper warnings on macOS 15+ (Apple Silicon).</p>
+        <pre><span class="c"># Homebrew (recommended)</span>
+brew install --cask sbaruwal/tap/aiworkstation
+
+<span class="c"># …or build from source — needs Xcode 26+</span>
 git clone https://github.com/sbaruwal/AIWorkstation.git
 cd AIWorkstation
 xcodebuild -project AIWorkstation.xcodeproj -scheme AIWorkstation -configuration Debug build</pre>

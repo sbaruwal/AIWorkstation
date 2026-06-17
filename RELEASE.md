@@ -98,19 +98,22 @@ git tag v0.1.0 && git push origin v0.1.0
 
 ---
 
-## Homebrew (optional, great for adoption)
+## Homebrew
 
-1. Create a public repo named **`homebrew-aiworkstation`**.
-2. Copy [`Casks/aiworkstation.rb`](Casks/aiworkstation.rb) to `Casks/aiworkstation.rb` in it.
-3. Per release, bump `version` + `sha256` (`shasum -a 256 build/AIWorkstation-<v>.dmg`) and commit.
-
-Users then:
+The tap is live at **[sbaruwal/homebrew-tap](https://github.com/sbaruwal/homebrew-tap)**, so users install with:
 
 ```sh
-brew install --cask sbaruwal/aiworkstation/aiworkstation
+brew install --cask sbaruwal/tap/aiworkstation
 ```
 
-Add that line to the README once the tap is live.
+**On each release**, update the cask in the tap so `brew upgrade` picks it up:
+
+```sh
+shasum -a 256 build/AIWorkstation-<v>.dmg          # grab the new digest
+```
+
+Then bump `version` + `sha256` in the tap's `Casks/aiworkstation.rb` and push. Keep this repo's
+[`Casks/aiworkstation.rb`](Casks/aiworkstation.rb) in sync as the source mirror.
 
 ---
 

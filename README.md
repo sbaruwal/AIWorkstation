@@ -115,19 +115,18 @@ A native Swift/SwiftUI app for macOS that puts **real PTY-backed terminals** on 
 
 ## Install
 
-**The easy way — download the signed app** (no Xcode required):
-
-1. Download the latest **[`AIWorkstation.dmg`](https://github.com/sbaruwal/AIWorkstation/releases/latest)** from Releases.
-2. Open it and drag **AIWorkstation** into **Applications**. The app is signed with an Apple Developer ID and notarized by Apple, so it opens with **no Gatekeeper warnings** — no `xattr` dance, no right-click-Open.
-3. Make sure your `claude` / `codex` CLIs are installed and on your `PATH` (see [Requirements](#requirements)). The app auto-detects them on first launch.
-
-Prefer Homebrew? Once the cask tap is published:
+**Homebrew** (recommended) — one command, and `brew upgrade` keeps it current:
 
 ```bash
-brew install --cask sbaruwal/aiworkstation/aiworkstation
+brew install --cask sbaruwal/tap/aiworkstation
 ```
 
-…or [build it from source](#build-from-source) below.
+**Or grab the `.dmg` directly:**
+
+1. Download the latest **[`AIWorkstation.dmg`](https://github.com/sbaruwal/AIWorkstation/releases/latest)** from Releases.
+2. Open it and drag **AIWorkstation** into **Applications**. It's signed with an Apple Developer ID and notarized by Apple, so it opens with **no Gatekeeper warnings** — no `xattr` dance, no right-click-Open.
+
+Either way, bring your own `claude` / `codex` CLIs on your `PATH` (see [Requirements](#requirements)) — the app auto-detects them on first launch. Or [build it from source](#build-from-source) below.
 
 ## Build from source
 
