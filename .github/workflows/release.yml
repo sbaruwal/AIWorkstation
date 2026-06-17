@@ -1,0 +1,121 @@
+name: Release
+
+# Automated signed + notarized DMG on a version tag (v1.2.3) or manual run.
+#
+# ⚠️ Toolchain caveat: AIWorkstation needs the macOS 26 SDK (FoundationModels). GitHub's
+# hosted runners may not carry Xcode 26 yet — if the "Select Xcode" step can't find it the
+# build fails. Until the hosted images catch up, the reliable path is `scripts/release.sh`
+# on your own Mac (or point this job at a self-hosted runner that has Xcode 26).
+#
+# Required repo secrets (Settings → Secrets and variables → Actions). See RELEASE.md:
+#   MACOS_CERT_P12_BASE64     base64 of your "Developer ID Application" .p12
+#   MACOS_CERT_PASSWORD       password you set when exporting the .p12
+#   MACOS_TEAM_ID             your 10-char Apple Team ID
+#   MACOS_NOTARY_KEY_ID       App Store Connect API key id
+#   MACOS_NOTARY_ISSUER_ID    App Store Connect issuer id
+#   MACOS_NOTARY_KEY_P8_BASE64  base64 of the App Store Connect API .p8 key
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version string (e.g. 0.1.0)
+        required: true
+
+permissions:
+  contents: write   # create the GitHub Release
+
+jobs:
+  release:
+    runs-on: macos-15   # swap to a self-hosted label if hosted runners lack Xcode 26
+    env:
+      APP_NAME: AIWorkstation
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}${{ github.event.inputs.version }}" | sed 's/=v*/=/' >> "$GITHUB_ENV"
+
+      - name: Select Xcode 26
+        run: |
+          DEV=$(ls -d /Applications/Xcode*26*.app 2>/dev/null | head -1 || true)
+          [ -z "$DEV" ] && DEV=$(ls -d /Applications/Xcode-beta.app 2>/dev/null | head -1 || true)
+          [ -z "$DEV" ] && DEV=$(ls -d /Applications/Xcode.app 2>/dev/null | head -1 || true)
+          echo "Using $DEV"
+          sudo xcode-select -switch "$DEV/Contents/Developer"
+          xcodebuild -version
+
+      - name: Import Developer ID certificate
+        env:
+          CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/app.keychain-db"
+          KEYCHAIN_PW="$(openssl rand -base64 24)"
+          security create-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PW" "$KEYCHAIN" >/dev/null
+          security list-keychain -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/cert.p12"
+
+      - name: Archive (Release, hardened runtime)
+        env:
+          TEAM_ID: ${{ secrets.MACOS_TEAM_ID }}
+        run: |
+          xcodebuild -project "$APP_NAME.xcodeproj" -scheme "$APP_NAME" -configuration Release \
+            -archivePath "$RUNNER_TEMP/$APP_NAME.xcarchive" archive \
+            ENABLE_HARDENED_RUNTIME=YES \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            MARKETING_VERSION="${VERSION:-0.0.0}" \
+            OTHER_CODE_SIGN_FLAGS="--timestamp --options runtime"
+
+      - name: Export (Developer ID)
+        env:
+          TEAM_ID: ${{ secrets.MACOS_TEAM_ID }}
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <plist version="1.0"><dict>
+            <key>method</key><string>developer-id</string>
+            <key>teamID</key><string>$TEAM_ID</string>
+            <key>signingStyle</key><string>manual</string>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/$APP_NAME.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
+
+      - name: Build DMG
+        run: |
+          brew install create-dmg
+          APP="$RUNNER_TEMP/export/$APP_NAME.app"
+          DMG="$RUNNER_TEMP/$APP_NAME-${VERSION:-0.0.0}.dmg"
+          create-dmg --volname "$APP_NAME" --window-size 660 380 \
+            --icon "$APP_NAME.app" 165 185 --app-drop-link 495 185 "$DMG" "$APP" \
+          || hdiutil create -volname "$APP_NAME" -srcfolder "$APP" -ov -format UDZO "$DMG"
+          echo "DMG=$DMG" >> "$GITHUB_ENV"
+
+      - name: Notarize + staple
+        env:
+          KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+          KEY_P8_BASE64: ${{ secrets.MACOS_NOTARY_KEY_P8_BASE64 }}
+        run: |
+          echo "$KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+          xcrun notarytool submit "$DMG" --key "$RUNNER_TEMP/AuthKey.p8" \
+            --key-id "$KEY_ID" --issuer "$ISSUER_ID" --wait
+          xcrun stapler staple "$DMG"
+          xcrun stapler validate "$DMG"
+          rm "$RUNNER_TEMP/AuthKey.p8"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.DMG }}
+          generate_release_notes: true
