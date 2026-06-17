@@ -16,6 +16,7 @@
 
 <p align="center">
   <a href="https://github.com/sbaruwal/AIWorkstation/releases/latest"><img src="https://img.shields.io/github/v/release/sbaruwal/AIWorkstation?label=download&color=000000&logo=apple&logoColor=white" alt="Download latest release"></a>
+  <a href="https://github.com/sbaruwal/homebrew-tap"><img src="https://img.shields.io/badge/brew-sbaruwal%2Ftap%2Faiworkstation-FBB040?logo=homebrew&logoColor=white" alt="Install with Homebrew"></a>
   <img src="https://img.shields.io/badge/platform-macOS-000000?logo=apple&logoColor=white" alt="macOS">
   <img src="https://img.shields.io/badge/Swift-SwiftUI%20%2B%20AppKit-FA7343?logo=swift&logoColor=white" alt="Swift">
   <img src="https://img.shields.io/badge/license-MIT-3b82f6" alt="MIT">
