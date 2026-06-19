@@ -106,14 +106,15 @@ The tap is live at **[sbaruwal/homebrew-tap](https://github.com/sbaruwal/homebre
 brew install --cask sbaruwal/tap/aiworkstation
 ```
 
-**On each release**, update the cask in the tap so `brew upgrade` picks it up:
+**On each release**, after `release.sh` + `gh release create`, bump both casks with one command:
 
 ```sh
-shasum -a 256 build/AIWorkstation-<v>.dmg          # grab the new digest
+./scripts/bump-cask.sh <version>      # e.g. ./scripts/bump-cask.sh 0.1.1
 ```
 
-Then bump `version` + `sha256` in the tap's `Casks/aiworkstation.rb` and push. Keep this repo's
-[`Casks/aiworkstation.rb`](Casks/aiworkstation.rb) in sync as the source mirror.
+It reads the sha256 from `build/AIWorkstation-<version>.dmg`, then updates **and pushes** both the
+tap's `Casks/aiworkstation.rb` (what `brew` reads) and this repo's
+[`Casks/aiworkstation.rb`](Casks/aiworkstation.rb) mirror. Users then `brew upgrade --cask aiworkstation`.
 
 ---
 
