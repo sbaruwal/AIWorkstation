@@ -8,8 +8,8 @@
 # Per release: bump `version` and `sha256` to match the notarized DMG
 # (`shasum -a 256 build/AIWorkstation-<version>.dmg`), then push it to the tap.
 cask "aiworkstation" do
-  version "0.1.1"
-  sha256 "cc4e4ce1ea902969a181185243a4a559a279fc88dc1fc9fe6fa70719c2b04a99"
+  version "0.1.2"
+  sha256 "e2b5e585c817274117957559f8c0adff2c5a362569566fbbfce82130c393c7b5"
 
   url "https://github.com/sbaruwal/AIWorkstation/releases/download/v#{version}/AIWorkstation-#{version}.dmg"
   name "AIWorkstation"
