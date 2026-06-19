@@ -82,13 +82,19 @@ APP="$EXPORT_DIR/$APP_NAME.app"
 
 echo "▸ Building DMG…"
 rm -f "$DMG"
+# Stage the app next to an /Applications symlink so the mounted DMG offers drag-to-install
+# even on the plain hdiutil path (when create-dmg isn't installed). create-dmg adds its own
+# drop-link via --app-drop-link, so it takes the app directly.
+DMG_STAGE="$WORK/dmgroot"; rm -rf "$DMG_STAGE"; mkdir -p "$DMG_STAGE"
+cp -R "$APP" "$DMG_STAGE/"
+ln -s /Applications "$DMG_STAGE/Applications"
 if command -v create-dmg >/dev/null 2>&1; then
   create-dmg --volname "$APP_NAME" --window-size 660 380 \
     --icon "$APP_NAME.app" 165 185 --app-drop-link 495 185 \
     "$DMG" "$APP" \
-  || hdiutil create -volname "$APP_NAME" -srcfolder "$APP" -ov -format UDZO "$DMG"
+  || hdiutil create -volname "$APP_NAME" -srcfolder "$DMG_STAGE" -ov -format UDZO "$DMG"
 else
-  hdiutil create -volname "$APP_NAME" -srcfolder "$APP" -ov -format UDZO "$DMG"
+  hdiutil create -volname "$APP_NAME" -srcfolder "$DMG_STAGE" -ov -format UDZO "$DMG"
 fi
 
 # Sign the DMG container too (not just the app), so Gatekeeper has a usable signature on
